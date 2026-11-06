@@ -1121,5 +1121,80 @@ wireBase=function(){
  }
 };
 
+// League HQ v1.7.4 — deterministic, capacity-preserving season fairness reconciliation.
+// Runs ONLY on an unsaved preview. Never revises published matches or scores.
+function flow174Reconcile(result,teams){
+ const ids=teams.map(x=>x.id),matches=result.matches,sessions=new Map(result.sessions.filter(s=>s.kind!=='championship').map(s=>[s.date,s]));
+ if(ids.length<3||!matches.length)return result;
+ const byDate=new Map(),byWave=new Map();
+ for(let i=0;i<matches.length;i++){
+  const m=matches[i];if(!byDate.has(m.date))byDate.set(m.date,[]);byDate.get(m.date).push(i);
+  const key=m.date+'@'+m.time;if(!byWave.has(key))byWave.set(key,[]);byWave.get(key).push(i);
+ }
+ const counts=Object.fromEntries(ids.map(id=>[id,0])),formatCounts={regular:Object.fromEntries(ids.map(id=>[id,0])),round_robin:Object.fromEntries(ids.map(id=>[id,0]))},pairs={};
+ const perDate=new Map([...byDate].map(([d])=>[d,Object.fromEntries(ids.map(id=>[id,0]))]));
+ function apply(index,home,away,sign){const m=matches[index],kind=sessions.get(m.date)?.kind||'regular',dateCount=perDate.get(m.date);for(const id of [home,away]){counts[id]+=sign;formatCounts[kind][id]+=sign;dateCount[id]+=sign}const k=flow172Key(home,away);pairs[k]=(pairs[k]||0)+sign;}
+ matches.forEach((m,i)=>apply(i,m.home,m.away,1));
+ function variance(vals){const a=Object.values(vals),mean=a.reduce((x,y)=>x+y,0)/a.length;return a.reduce((s,x)=>s+(x-mean)**2,0)}
+ function score(){
+  const total=variance(counts),regular=variance(formatCounts.regular),team=variance(formatCounts.round_robin);
+  // Strict priority: minimize TOTAL games spread, then format spreads, then repeated opponents.
+  const pairVariance=variance(Object.fromEntries(flow172Pairs(ids).map(p=>[flow172Key(...p),pairs[flow172Key(...p)]||0])));
+  return total*100000+regular*100+team*100+pairVariance;
+ }
+ function allowed(index,h,a){
+  const m=matches[index],session=sessions.get(m.date);if(!session||h===a)return false;
+  const maxNight=session.kind==='regular'?2:Math.max(2,Math.ceil(2*(Math.floor((flow172Minutes(session.end)-flow172Minutes(session.start))/session.minutes)*session.courts)/ids.length)+1);
+  const dateCount=perDate.get(m.date);
+  if(dateCount[h]>=maxNight+(h===m.home||h===m.away?1:0)||dateCount[a]>=maxNight+(a===m.home||a===m.away?1:0))return false;
+  for(const otherIndex of byWave.get(m.date+'@'+m.time)||[]){if(otherIndex===index)continue;const other=matches[otherIndex];if(other.home===h||other.away===h||other.home===a||other.away===a)return false;}
+  return true;
+ }
+ let improvements=0;
+ // Reassign one participant only when doing so strictly improves global fairness.
+ // Deterministic tie breaking: earliest date/slot first, then stable team order.
+ for(let step=0;step<Math.min(ids.length>10?24:80,matches.length*2);step++){
+  let best=null,bestScore=score();
+  for(let i=0;i<matches.length;i++){
+   const m=matches[i],original=[m.home,m.away];
+   for(let side=0;side<2;side++)for(const replacement of ids){
+    if(original.includes(replacement))continue;
+    const proposed=side===0?[replacement,original[1]]:[original[0],replacement];
+    if(!allowed(i,...proposed))continue;
+    apply(i,...original,-1);apply(i,...proposed,1);
+    const candidate=score();
+    apply(i,...proposed,-1);apply(i,...original,1);
+    if(candidate<bestScore-1e-7){bestScore=candidate;best={i,home:proposed[0],away:proposed[1]};}
+   }
+  }
+  if(!best)break;
+  const m=matches[best.i];apply(best.i,m.home,m.away,-1);m.home=best.home;m.away=best.away;apply(best.i,m.home,m.away,1);improvements++;
+ }
+ // Regenerate the data the preview actually displays from the finalized matches.
+ const capacity=result.capacity;
+ capacity.totals=ids.map(id=>({id,name:teams.find(t=>t.id===id)?.name||id,games:counts[id],regular:formatCounts.regular[id],teamNight:formatCounts.round_robin[id]}));
+ capacity.report=capacity.report.map(row=>({...row,perTeam:{...perDate.get(row.date)}}));
+ capacity.warnings=capacity.warnings.filter(w=>!/^Season totals differ by \d+ games;/.test(w)&&!/games per team range from/.test(w));
+ const values=ids.map(id=>counts[id]),spread=Math.max(...values)-Math.min(...values),equalPossible=(matches.length*2)%ids.length===0;
+ if(spread>1)capacity.warnings.push(`Season totals differ by ${spread} games after fairness reconciliation; check session constraints.`);
+ else if(spread===1&&equalPossible)capacity.warnings.push('Some game totals still differ by one even though the total number of games is divisible equally; review per-night limits.');
+ capacity.reconciliation={adjustments:improvements,spread,equalPossible,perfect:spread===0};
+ return result;
+}
+const flow174OriginalBuild=flow172Build;
+flow172Build=function(plan,teams){return flow174Reconcile(flow174OriginalBuild(plan,teams),teams)};
+flow171Build=flow172Build;
+flow17Build=flow172Build;
+const flow174PreviousSchedulePage=flow17SchedulePage;
+flow17SchedulePage=function(){
+ let html=flow174PreviousSchedulePage();
+ const preview=flow17.previewScope===flow17Scope()?flow17.preview:null;
+ if(!flow17Plan()&&preview?.result.capacity?.reconciliation){
+  const rec=preview.result.capacity.reconciliation;
+  const notice=`<p class="mini" id="flow174FairnessStatus"><strong>Fairness check:</strong> ${rec.perfect?'Every team has the same number of scheduled games.':`Season game totals differ by ${rec.spread}.`} ${rec.adjustments} matchup adjustment${rec.adjustments===1?'':'s'} made without changing court slots or times.</p>`;
+  html=html.replace('<h3>Season game distribution</h3>',notice+'<h3>Season game distribution</h3>');
+ }
+ return html;
+};
 init();
 </script></body></html>
