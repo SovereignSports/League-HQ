@@ -49,7 +49,7 @@
 .flow17-nav{display:flex;gap:7px;overflow-x:auto;padding:7px 0 18px;scrollbar-width:thin}.flow17-nav .btn{white-space:nowrap;font-size:12px;min-height:40px;padding:9px 11px;flex:0 0 auto}
 .flow17-map{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:8px}.flow17-days{display:grid;grid-template-columns:1fr;gap:10px}.flow17-day{border:1px solid #dbe3ec;border-radius:14px;padding:13px;background:#fbfcff}.flow17-day .row{justify-content:flex-start;gap:10px}.flow17-day-config{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:9px;margin:10px 0 0}.flow17-day-config label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#506178;font-weight:700}.flow17-day-config label.flow17-check{flex-direction:row;align-items:center}.flow17-day-config input,.flow17-day-config select{min-height:39px;padding:7px;font-size:13px}.flow17-details{border:1px solid #dce3eb;border-radius:11px;padding:13px;margin:12px 0}.flow17-details summary{cursor:pointer;font-weight:750;color:#132a4b}
 .home-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}@media(min-width:840px){.home-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:600px){.flow17-map{grid-template-columns:1fr 1fr}.flow17-day-config{grid-template-columns:repeat(2,minmax(0,1fr))}.home-tiles .home-tile{min-height:135px}}@media(max-width:400px){.flow17-map{grid-template-columns:1fr}}
-</style></head><body><header class="top"><div class="shell"><div class="brand"><span class="mark">♛</span>LEAGUE HQ<small>DIRECTOR + PLAYER HUB</small></div><div class="row"><span id="who" class="mini muted"></span><button id="logout" class="btn ghost hide">Sign out</button></div></div></header><main id="root" class="shell"><div class="card">Connecting…</div></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script>
+</style><style id="league-hq-v175-scores">.flow175-modal{max-width:620px}.flow175-score-head,.flow175-score-row{display:grid;grid-template-columns:88px minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center;margin:8px 0}.flow175-score-head{font-size:12px;color:#506178;text-align:center}.flow175-score-row input{width:100%;min-width:0;min-height:48px;text-align:center;font-size:20px;font-weight:700;border:1px solid #cbd5e1;border-radius:10px;padding:6px}.flow175-set-label{font-size:13px;font-weight:750}.flow175-set-label small{display:block;font-weight:400;color:#64748b}.flow175-summary{margin:15px 0;padding:12px;border-radius:10px;background:#eff5fb;font-size:13px;color:#16365b}.flow175-error{color:#a12b2b;background:#fff1f1;border-radius:8px;padding:10px;margin:10px 0;font-size:13px}.flow175-awards{margin-top:12px}.flow175-awards summary{cursor:pointer;font-weight:700}@media(max-width:520px){.flow175-score-head,.flow175-score-row{grid-template-columns:60px minmax(0,1fr) minmax(0,1fr);gap:6px}.flow175-modal{padding:16px}.flow175-score-row input{font-size:18px}}</style></head><body><header class="top"><div class="shell"><div class="brand"><span class="mark">♛</span>LEAGUE HQ<small>DIRECTOR + PLAYER HUB</small></div><div class="row"><span id="who" class="mini muted"></span><button id="logout" class="btn ghost hide">Sign out</button></div></div></header><main id="root" class="shell"><div class="card">Connecting…</div></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script>
 'use strict';
 // Supabase browser publishable key: never include service-role or secret keys.
 const PROJECT_URL='https://sfukoetvqhtyunyatvup.supabase.co';
@@ -215,7 +215,7 @@ wireBase=function(){v03WireBase();
  form('addNews',e=>{e.preventDefault();const f=new FormData(e.target);action(()=>saveRecord('lhq_news',{...newScope(),title:String(f.get('title')||'').trim(),body:String(f.get('body')||'').trim(),status:f.get('status')}),'News saved.')});
  bind('[data-remove-team]',el=>{const id=el.dataset.removeTeam;if(seasonRows('members').some(x=>x.team_id===id)||seasonRows('matches').some(x=>x.home_team_id===id||x.away_team_id===id)){setAlert('Only empty, unused teams may be deleted.',true);return}if(confirm('Delete this empty team?'))action(()=>deleteRecord('lhq_teams',id),'Team deleted.')});
  bind('[data-remove-group]',el=>{if(confirm('Delete this assignment group?'))action(()=>deleteRecord('lhq_assignment_groups',el.dataset.removeGroup),'Group deleted.')});
- bind('[data-score-match]',el=>{const m=model.matches.find(x=>x.id===el.dataset.scoreMatch);if(!m)return;const a=prompt(`Score for ${teamName(m.home_team_id)} (e.g. sets won)`,m.home_score??'');if(a===null)return;const b=prompt(`Score for ${teamName(m.away_team_id)}`,m.away_score??'');if(b===null)return;const x=Number(a),y=Number(b);if(!/^\d+$/.test(a)||!/^\d+$/.test(b)||x===y){setAlert('Enter different nonnegative integer scores for each team.',true);return}if(!confirm(`Save ${teamName(m.home_team_id)} ${x} – ${y} ${teamName(m.away_team_id)}?`))return;action(()=>updateRecord('lhq_matches',m.id,{home_score:x,away_score:y,status:'completed',updated_at:new Date().toISOString()}),'Result saved.')});
+ // v1.7.5: scoring is handled only by the unified set-score editor; legacy prompt listener removed.
  bind('[data-delete-match]',el=>{if(confirm('Delete this match and any result?'))action(()=>deleteRecord('lhq_matches',el.dataset.deleteMatch),'Match deleted.')});
  bind('[data-news-toggle]',el=>action(()=>updateRecord('lhq_news',el.dataset.newsToggle,{status:el.dataset.newsStatus,updated_at:new Date().toISOString()}),'News status updated.'));
  bind('[data-news-remove]',el=>{if(confirm('Delete this announcement?'))action(()=>deleteRecord('lhq_news',el.dataset.newsRemove),'Announcement deleted.')});
@@ -1196,5 +1196,78 @@ flow17SchedulePage=function(){
  }
  return html;
 };
+
+// League HQ v1.7.5 — one score-entry editor; scheduled format is authoritative.
+// The old prompt handler was intentionally removed from wireBase above to prevent double actions.
+function flow175Spec(match){
+ const best=Number(match.best_of)||3;
+ if(![1,3,5].includes(best))throw Error('Unsupported match format: '+best+'.');
+ const declared=Array.isArray(match.set_targets)&&match.set_targets.length===best?match.set_targets.map(Number):null;
+ const single=Number(match.target_points)||15;
+ const targets=declared||Array.from({length:best},(_,i)=>best===1?single:(i===best-1?15:21));
+ if(targets.some(t=>!Number.isInteger(t)||t<1||t>999))throw Error('Match set targets are invalid.');
+ return {best,targets,allSets:best>1&&match.play_all_sets===true,needed:Math.ceil(best/2)};
+}
+function flow175Evaluate(raw,spec){
+ const scores=[];let emptySeen=false;
+ for(let i=0;i<spec.best;i++){
+  const pair=raw[i]||['',''],hs=String(pair[0]??'').trim(),as=String(pair[1]??'').trim();
+  if(!hs&&!as){emptySeen=true;continue;}
+  if(emptySeen||hs===''||as==='')throw Error('Enter both scores for consecutive sets.');
+  if(!/^\d+$/.test(hs)||!/^\d+$/.test(as))throw Error('Set '+(i+1)+': enter nonnegative whole numbers.');
+  const h=Number(hs),a=Number(as);if(h>999||a>999||h===a||Math.max(h,a)<spec.targets[i])throw Error('Set '+(i+1)+': a team must reach '+spec.targets[i]+' and win without a tie.');
+  scores.push([h,a]);
+ }
+ if(!scores.length)throw Error('Enter at least one set.');
+ const hw=scores.filter(([h,a])=>h>a).length,aw=scores.length-hw;
+ if(spec.allSets){if(scores.length!==spec.best)throw Error('All '+spec.best+' scheduled sets must be recorded.');}
+ else{
+  if(Math.max(hw,aw)!==spec.needed)throw Error('Complete the match when a team wins '+spec.needed+' set'+(spec.needed===1?'':'s')+'.');
+  for(let i=0;i<scores.length-1;i++){const chunk=scores.slice(0,i+1),h=chunk.filter(([x,y])=>x>y).length,a=chunk.length-h;if(Math.max(h,a)>=spec.needed)throw Error('This match was decided before the final entered set.');}
+ }
+ return {scores,home:hw,away:aw};
+}
+function flow175ScoreEditor(id){
+ const m=model.matches.find(x=>x.id===id);if(!m)return;
+ let spec;try{spec=flow175Spec(m)}catch(e){setAlert(e.message,true);return;}
+ document.getElementById('flow175ScoreCover')?.remove();
+ const previous=checkedSets(m.sets),home=teamName(m.home_team_id),away=teamName(m.away_team_id),manual=compSettings().scoring_mode==='manual'&&m.stage==='regular';
+ const cover=document.createElement('div');cover.id='flow175ScoreCover';cover.className='modalcover';
+ cover.innerHTML=`<div class="modal flow175-modal" role="dialog" aria-modal="true" aria-labelledby="flow175Title">
+ <div class="row between"><div><h2 id="flow175Title">Enter match scores</h2><p class="mini muted">${esc(m.match_date||'')} · ${esc(String(m.start_time||'').slice(0,5))} ${esc(m.court||'')}</p></div><button class="btn ghost" type="button" id="flow175Close" aria-label="Close score editor">Close</button></div>
+ <p class="mini">${spec.best===1?'Single game to '+spec.targets[0]:(spec.allSets?'All '+spec.best+' sets required':'Best of '+spec.best+'; stop when decided')} · ${esc(spec.targets.join(' / '))}</p>
+ <form id="flow175Form"><div class="flow175-score-head"><span>Set</span><strong>${esc(home)}</strong><strong>${esc(away)}</strong></div>
+ ${spec.targets.map((target,i)=>`<div class="flow175-score-row"><label class="flow175-set-label" for="flow175h${i}">Set ${i+1}<small>to ${target}</small></label><input aria-label="Set ${i+1} ${esc(home)}" id="flow175h${i}" name="h${i}" type="number" inputmode="numeric" min="0" max="999" value="${previous[i]?.[0]??''}" placeholder="—"><input aria-label="Set ${i+1} ${esc(away)}" id="flow175a${i}" name="a${i}" type="number" inputmode="numeric" min="0" max="999" value="${previous[i]?.[1]??''}" placeholder="—"></div>`).join('')}
+ ${manual?`<details class="flow175-awards"><summary>Director-awarded standings points</summary><div class="split"><label class="field">${esc(home)}<input type="number" min="0" max="10000" name="awardHome" value="${m.awarded_home??''}" required></label><label class="field">${esc(away)}<input type="number" min="0" max="10000" name="awardAway" value="${m.awarded_away??''}" required></label></div></details>`:''}
+ <div id="flow175Summary" class="flow175-summary" aria-live="polite">Enter both teams' points for each played set.</div><div id="flow175Error" class="flow175-error" role="alert" hidden></div>
+ <div class="actions"><button class="btn primary" type="submit" id="flow175Save">Save match result</button><button type="button" class="btn ghost" id="flow175Cancel">Cancel</button></div></form></div>`;
+ document.body.appendChild(cover);
+ const form=cover.querySelector('#flow175Form'),summary=cover.querySelector('#flow175Summary'),error=cover.querySelector('#flow175Error'),close=()=>cover.remove();
+ cover.querySelector('#flow175Close').onclick=close;cover.querySelector('#flow175Cancel').onclick=close;
+ cover.addEventListener('click',e=>{if(e.target===cover)close()});
+ function entries(){return spec.targets.map((_,i)=>[form.elements['h'+i].value,form.elements['a'+i].value]);}
+ function update(){error.hidden=true;const pairs=entries(),completed=pairs.filter(([h,a])=>h!==''&&a!==''&&!Number.isNaN(Number(h))&&!Number.isNaN(Number(a))&&Number(h)!==Number(a));const hw=completed.filter(([h,a])=>Number(h)>Number(a)).length,aw=completed.length-hw;
+  summary.textContent=completed.length?`Sets recorded: ${completed.length}/${spec.best} · ${home}: ${hw} · ${away}: ${aw}${spec.allSets?' · All sets count':''}`:'Enter both teams’ points for each played set.';
+ }
+ form.addEventListener('input',update);update();
+ form.onsubmit=e=>{e.preventDefault();let outcome;try{outcome=flow175Evaluate(entries(),spec);}catch(err){error.textContent=err.message;error.hidden=false;return;}
+  const updates={sets:outcome.scores,home_score:outcome.home,away_score:outcome.away,status:'completed',updated_at:new Date().toISOString()};
+  if(manual){const h=String(new FormData(form).get('awardHome')??''),a=String(new FormData(form).get('awardAway')??'');if(!/^\d+$/.test(h)||!/^\d+$/.test(a)||Number(h)>10000||Number(a)>10000){error.textContent='Enter valid director-awarded standings points.';error.hidden=false;return;}updates.awarded_home=Number(h);updates.awarded_away=Number(a);}
+  if(!confirm(`Save ${home} ${outcome.home}–${outcome.away} ${away} (${outcome.scores.length} set${outcome.scores.length===1?'':'s'})?`))return;
+  close();action(()=>updateRecord('lhq_matches',m.id,updates),'Match scores saved. Standings will update from the recorded sets.');
+ };
+ cover.querySelector('#flow175h0')?.focus();
+}
+compScoreModal=flow175ScoreEditor;
+const flow175PreviousMatchCard=matchCard;
+matchCard=function(m){
+ let html=flow175PreviousMatchCard(m);
+ const sets=checkedSets(m.sets);
+ if(m.status==='completed'&&sets.length){const line=sets.map((s,i)=>`Set ${i+1}: ${s[0]}–${s[1]}`).join(' · ');
+  html=html.replace('<div class="actions">',`<p class="mini muted">${esc(line)}</p><div class="actions">`);
+ }
+ return html;
+};
+
 init();
 </script></body></html>
