@@ -150,7 +150,7 @@ $('root').innerHTML=`<div class="workspace-head"><div class="eyebrow">LEAGUE HQ 
 <button class="btn ghost" id="reload" title="Refresh league data">↻ Refresh</button></div>
 <div class="context-actions"><label class="row mini"><input type="checkbox" id="showArchived" ${state.archived?'checked':''}> Show archived records</label><span class="badge">${esc(selectedSeason()?.status||'No season selected')}</span></div></div>
 ${state.tab!=='overview'?`<div class="workspace-return"><button class="btn ghost" data-goto="overview" aria-label="Back to Director Hub">← Director Hub</button><span class="workspace-current">${esc(tabs.find(t=>t[0]===state.tab)?.[1]||'Workspace')}</span></div>`:''}
-<div id="alerts" style="margin-bottom:12px"></div><section id="content">${pageContent()}</section><div class="foot">League HQ v1.7 Workflow Integration Candidate · Director review required · All records remain in the independent League HQ Supabase project.</div>`;
+<div id="alerts" style="margin-bottom:12px"></div><section id="content">${pageContent()}</section><div class="foot">League HQ v1.7.1 Date Format Correction Candidate · Director review required · All records remain in the independent League HQ Supabase project.</div>`;
 wireBase();renderAlert();if(state.error)setAlert(state.error,true)}
 function pageContent(){if(state.tab==='leagues')return leaguesPage();if(state.tab==='seasons')return seasonsPage();if(state.tab==='players')return playersPage();if(state.tab==='playerhub')return '<div class="card"><h2>Player Hub · Planned</h2><p>The public Player Hub is deliberately not connected yet. Public standings, schedules and news will come after we create permission-safe publication views.</p><div class="note">Private player directory records remain director-only.</div></div>';return overviewPage()}
 function overviewPage(){const leagues=visibleLeagues(),seasons=visibleSeasons(),players=state.players.filter(p=>p.organization_id===state.orgId);return `<div class="hq-home-hero"><div class="eyebrow">ACTIVE WORKSPACE</div><h2>${esc(selectedLeague()?.name||'Choose a league')}</h2><p>${esc(selectedSeason()?.name||'Choose or create a season')} ${selectedSeason()?.starts_on?' · '+esc(selectedSeason().starts_on):''} ${selectedSeason()?.ends_on?'– '+esc(selectedSeason().ends_on):''}</p></div>
@@ -908,6 +908,111 @@ wireBase=function(){flow17Wire0();for(const id of ['orgSelect','leagueSelect','s
  document.querySelectorAll('[data-flow17-decision]').forEach(el=>el.onclick=()=>{const req=outreachReqs().find(r=>r.id===el.dataset.flow17Decision),decision=el.dataset.decision;if(!req||!['approved','rejected'].includes(decision))return;const reg=model.registrations.find(r=>r.season_id===state.seasonId&&r.player_id===req.player_id);if(decision==='rejected'&&seasonRows('members').some(m=>m.player_id===req.player_id))return setAlert('Remove this player from the assigned team before rejecting.',true);if(!confirm(`${decision==='approved'?'Approve':'Reject'} the registration for ${playerName(req.player_id)}?`))return;action(async()=>{const {data,error}=await db.rpc('lhq_registration_decide',{p_request_id:req.id,p_decision:decision});if(error)throw error;if(data!==true)throw Error('Registration decision not confirmed')},'Registration '+decision+'.')});
  const bracket=$('createBracket');if(bracket){const original=bracket.onsubmit;bracket.onsubmit=e=>{const gate=flow17ChampGate();if(!gate.allowed){e.preventDefault();setAlert('Championship locked: complete the entire scheduled regular season first.',true);return}if(bracket.querySelector('[name=format]')?.value==='double'){e.preventDefault();if(compBracket())return setAlert('Bracket already exists.',true);const names=String(new FormData(bracket).get('seeds')||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);const ids=[];for(const name of names){const hits=seasonRows('teams').filter(x=>x.name.toLowerCase()===name.toLowerCase());if(hits.length!==1)return setAlert('Seed must identify exactly one team: '+name,true);ids.push(hits[0].id)}let b;try{b=flow17DoubleMake(ids)}catch(err){return setAlert(err.message,true)}if(!confirm('Create a double-elimination championship? Bracket progression follows scored waves and includes a deciding final if needed.'))return;action(()=>saveRecord('lhq_championship_brackets',{...newScope(),format:'double',bracket:b}),'Double-elimination bracket created.');return}if(original)original(e)}}
  document.querySelectorAll('[data-bracket-score]').forEach(el=>{if(compBracket()?.format==='double')el.onclick=()=>flow17DoubleScore(el.dataset.bracketScore)});
+};
+
+// v1.7.1 Date-by-date format overrides and set-target-aware scoring.
+// Preserves the working v1.7 season builder and protects published schedules.
+function flow171Targets(rule){
+ const best=Number(rule.bestOf||1);
+ if(![1,3,5].includes(best))throw Error('Choose single game, best of three, or best of five.');
+ let targets=Array.isArray(rule.targets)?rule.targets.map(Number):[];
+ if(!targets.length)targets=best===1?[Number(rule.target||15)]:best===3?[21,21,15]:[21,21,21,21,15];
+ if(targets.length!==best||targets.some(n=>!Number.isInteger(n)||n<1||n>99))throw Error('Point targets must contain '+best+' valid values (1–99).');
+ return targets;
+}
+function flow171Format(rule){return rule.bestOf===1?'Single game to '+flow171Targets(rule)[0]:'Best of '+rule.bestOf+' · '+flow171Targets(rule).join('/')}
+function flow171FormatFromControls(container){const kind=container.querySelector('[data-rule-kind]')?.value,bestOf=Number(container.querySelector('[data-rule-best]')?.value),text=String(container.querySelector('[data-rule-targets]')?.value||'').trim();const targets=text.split(/[\s,\/]+/).filter(Boolean).map(Number);if(!['regular','round_robin'].includes(kind))throw Error('Choose a valid session format.');const sample={kind,bestOf,targets};flow171Targets(sample);return sample}
+function flow171Build(plan,teams){
+ if(!teams||teams.length<2)throw Error('Create at least two teams first.');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(plan.start))throw Error('Choose a start date.');
+ const weeks=Number(plan.weeks);if(!Number.isInteger(weeks)||weeks<2||weeks>52)throw Error('Choose 2–52 weeks, including championship week.');
+ const rules=(plan.rules||[]).filter(r=>r.enabled);if(!rules.length)throw Error('Choose at least one play day.');
+ const rounds=flow17RoundRobin(teams.map(x=>x.id));let cursor=0;
+ const sessions=[],matches=[],first=flow17LocalDate(plan.start);
+ for(let week=1;week<=weeks;week++){
+  const start=new Date(first);start.setDate(first.getDate()+(week-1)*7);
+  const dates=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d}).filter(d=>rules.some(r=>r.day===d.getDay()));
+  if(!dates.length)throw Error(`Week ${week} has no selected play days.`);
+  for(const date of dates){
+   const last=week===weeks;if(last&&date!==dates[0])continue;
+   const dateKey=flow17ISO(date),base=rules.find(r=>r.day===date.getDay());
+   const rule={...base,...(last?{}:plan.overrides?.[dateKey]||{})};
+   if(!['regular','round_robin'].includes(rule.kind))throw Error('Unknown format on '+dateKey);
+   if(!Number.isInteger(Number(rule.courts))||Number(rule.courts)<1||Number(rule.courts)>20)throw Error('Invalid court count on '+dateKey);
+   const targets=last?[21,21,15]:flow171Targets(rule),bestOf=last?3:Number(rule.bestOf),kind=last?'championship':rule.kind;
+   const spec={date:dateKey,week,kind,target:targets[0],targets,best_of:bestOf,standings:last?false:!!rule.standings,start:rule.time,courts:Number(rule.courts),minutes:Number(rule.minutes),label:last?'Championship (reserved)':kind==='round_robin'?'Team Night':'Regular League Night'};
+   sessions.push(spec);if(last)continue;
+   const pairs=kind==='round_robin'?rounds.flat():rounds[cursor++%rounds.length],waves=[];
+   for(const [home,away] of pairs){let placed=false;for(const wave of waves){if(wave.length<rule.courts&&wave.every(m=>m.home!==home&&m.away!==home&&m.home!==away&&m.away!==away)){wave.push({home,away});placed=true;break}}if(!placed)waves.push([{home,away}]);}
+   for(let wi=0;wi<waves.length;wi++)for(let ci=0;ci<waves[wi].length;ci++){
+    const p=waves[wi][ci];matches.push({...p,date:dateKey,week,time:flow17Time(rule.time,wi*rule.minutes),court:ci+1,best_of:bestOf,target:targets[0],targets:[...targets],standings:!!rule.standings});
+   }
+  }
+ }
+ if(sessions.length>300||matches.length>1000)throw Error('Schedule exceeds 300 sessions or 1000 matches. Shorten season or use fewer team nights.');
+ return {sessions,matches};
+}
+flow17Build=flow171Build;
+const flow171SchedulePage0=flow17SchedulePage;
+flow17SchedulePage=function(){
+ let html=flow171SchedulePage0();const p=flow17.previewScope===flow17Scope()?flow17.preview:null;
+ if(!p||flow17Plan())return html;
+ const regular=p.result.sessions.filter(s=>s.kind!=='championship');
+ const editor=`<div class="card" id="flow171Editor"><h2>Customize each playing date</h2><p class="mini">Each session can use a different format. Edit a date, then choose <strong>Update preview</strong>. To apply one date's settings across multiple dates, select the source and check destination dates.</p>
+ <div class="tablewrap"><table><thead><tr><th>Copy to</th><th>Week / Date</th><th>Session format</th><th>Match</th><th>Set targets</th><th>Standings</th></tr></thead><tbody>${regular.map(s=>`<tr data-flow171-date="${esc(s.date)}"><td><input type="checkbox" data-flow171-check aria-label="Select ${esc(s.date)} for copying" style="width:auto;min-height:0"></td><td><strong>W${s.week}</strong><br>${esc(s.date)}</td><td><select data-rule-kind><option value="regular" ${s.kind==='regular'?'selected':''}>Regular</option><option value="round_robin" ${s.kind==='round_robin'?'selected':''}>Team night / round robin</option></select></td><td><select data-rule-best><option value="1" ${s.best_of===1?'selected':''}>1 game</option><option value="3" ${s.best_of===3?'selected':''}>Best of 3</option><option value="5" ${s.best_of===5?'selected':''}>Best of 5</option></select></td><td><input data-rule-targets value="${esc(s.targets.join('/'))}" aria-label="Set targets for ${esc(s.date)}" style="min-width:110px" title="E.g., 21/21/15"></td><td><input type="checkbox" data-rule-stand ${s.standings?'checked':''} style="width:auto;min-height:0"></td></tr>`).join('')}</tbody></table></div>
+ <div class="actions"><button type="button" class="btn primary" id="flow171Update">Update preview</button><label class="field" style="min-width:160px"><span class="label">Copy settings from date</span><select id="flow171Source">${regular.map(s=>`<option value="${esc(s.date)}">Week ${s.week} · ${esc(s.date)}</option>`).join('')}</select></label><button type="button" class="btn ghost" id="flow171Copy">Copy to checked dates</button></div>
+ <p class="mini">Examples: team night = 1 game, 15; normal match = best of 3, 21/21/15. Championship week is reserved and cannot be edited here. No changes reach the database until you publish.</p></div>`;
+ // Add editor before the existing preview, with the original preview refreshed after edits.
+ html=html.replace('<div class="card"><h2>Preview ·',editor+'<div class="card"><h2>Preview ·');
+ html=html.replace(/To \$\{m\.target\} · \$\{m\.best_of===1\?'One game':'Best of '\+m\.best_of\}/g,'${m.targets?m.targets.join("/"):m.target} · ${m.best_of===1?"One game":"Best of "+m.best_of}');
+ // The original match preview is already rendered. Update each match row's format text.
+ for(const m of p.result.matches){
+  const old=`<td>To ${m.target} · ${m.best_of===1?'One game':'Best of '+m.best_of}</td>`;
+  const latest=`<td>${esc(m.targets.join('/'))} · ${m.best_of===1?'One game':'Best of '+m.best_of}</td>`;
+  html=html.replace(old,latest);
+ }
+ for(const s of p.result.sessions){const before=`${esc(s.label)} · to ${s.target}`;const after=`${esc(s.label)} · ${esc(flow171Format({bestOf:s.best_of,targets:s.targets}))}`;html=html.replace(before,after)}
+ return html;
+};
+const flow171Wire0=wireBase;
+wireBase=function(){flow171Wire0();
+ const editor=$('flow171Editor');if(!editor)return;
+ const rows=()=>[...editor.querySelectorAll('[data-flow171-date]')];
+ function snapshot(row){const fmt=flow171FormatFromControls(row);return {...fmt,standings:!!row.querySelector('[data-rule-stand]')?.checked}}
+ function updatePreview(){
+  try{const candidate=flow17.preview;if(!candidate||flow17.previewScope!==flow17Scope())throw Error('Preview expired. Generate again.');
+   const overrides={...(candidate.plan.overrides||{})};
+   rows().forEach(row=>{const date=row.dataset.flow171Date;const format=snapshot(row);overrides[date]={...overrides[date],...format};});
+   const plan={...candidate.plan,overrides};const result=flow171Build(plan,seasonRows('teams'));
+   flow17.preview={plan,result};render();
+  }catch(err){setAlert(err.message||String(err),true)}
+ }
+ const update=$('flow171Update');if(update)update.onclick=updatePreview;
+ const copy=$('flow171Copy');if(copy)copy.onclick=()=>{
+  try{const from=rows().find(r=>r.dataset.flow171Date===$('flow171Source')?.value);if(!from)throw Error('Choose a source date.');const setting=snapshot(from);let count=0;
+  rows().filter(r=>r.querySelector('[data-flow171-check]')?.checked&&r!==from).forEach(r=>{r.querySelector('[data-rule-kind]').value=setting.kind;r.querySelector('[data-rule-best]').value=String(setting.bestOf);r.querySelector('[data-rule-targets]').value=setting.targets.join('/');r.querySelector('[data-rule-stand]').checked=setting.standings;count++});
+  if(!count)throw Error('Check at least one different destination date.');updatePreview();
+  }catch(err){setAlert(err.message||String(err),true)}
+ };
+ editor.querySelectorAll('[data-rule-best]').forEach(el=>el.onchange=()=>{const row=el.closest('[data-flow171-date]');row.querySelector('[data-rule-targets]').value=Number(el.value)===1?'15':Number(el.value)===3?'21/21/15':'21/21/21/21/15'});
+ editor.querySelectorAll('[data-rule-kind]').forEach(el=>el.onchange=()=>{const row=el.closest('[data-flow171-date]');if(el.value==='round_robin'){row.querySelector('[data-rule-best]').value='1';row.querySelector('[data-rule-targets]').value='15'}else{row.querySelector('[data-rule-best]').value='3';row.querySelector('[data-rule-targets]').value='21/21/15'}});
+};
+// Enforce the selected target for every set in a generated multi-set match.
+const flow171Score0=compScoreModal;
+compScoreModal=function(id){
+ const m=model.matches.find(x=>x.id===id);if(!m||![3,5].includes(m.best_of)||!Array.isArray(m.set_targets)||m.set_targets.length!==m.best_of)return flow171Score0(id);
+ const sets=checkedSets(m.sets),cfg=compSettings(),targets=m.set_targets.map(Number);
+ const cover=document.createElement('div');cover.className='modalcover';cover.id='flow171ScoreCover';
+ cover.innerHTML=`<div class="modal" role="dialog" aria-modal="true"><h2>Match score · ${targets.join('/')}</h2><p>${esc(teamName(m.home_team_id))} vs ${esc(teamName(m.away_team_id))}</p><p class="mini">Best of ${m.best_of}. First to the set target wins. Enter only completed sets.</p><form id="flow171ScoreForm">${targets.map((target,i)=>`<div class="split"><label class="field">Set ${i+1} · to ${target} · Home<input type="number" min="0" max="999" name="h${i}" value="${sets[i]?.[0]??''}"></label><label class="field">Set ${i+1} · to ${target} · Away<input type="number" min="0" max="999" name="a${i}" value="${sets[i]?.[1]??''}"></label></div>`).join('')}${cfg.scoring_mode==='manual'&&m.stage==='regular'?`<div class="split"><label class="field">Standings points · Home<input type="number" min="0" max="10000" name="awardHome" value="${m.awarded_home??''}" required></label><label class="field">Standings points · Away<input type="number" min="0" max="10000" name="awardAway" value="${m.awarded_away??''}" required></label></div>`:''}<div class="actions"><button class="btn primary" type="submit">Save verified result</button><button class="btn ghost" type="button" id="flow171CancelScore">Cancel</button></div></form></div>`;
+ document.body.appendChild(cover);$('flow171CancelScore').onclick=()=>cover.remove();
+ $('flow171ScoreForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),scores=[];let stopped=false;
+  for(let i=0;i<targets.length;i++){const h=String(f.get('h'+i)??'').trim(),a=String(f.get('a'+i)??'').trim();if(!h&&!a){stopped=true;continue}if(stopped||h===''||a==='')return setAlert('Enter consecutive sets with both scores.',true);
+   const x=Number(h),y=Number(a);if(!Number.isInteger(x)||!Number.isInteger(y)||x<0||y<0||x>999||y>999||x===y||Math.max(x,y)<targets[i])return setAlert('Set '+(i+1)+' requires a clear winner reaching '+targets[i]+' points.',true);scores.push([x,y]);}
+  const required=(m.best_of+1)/2,winsHome=scores.filter(s=>s[0]>s[1]).length,winsAway=scores.length-winsHome;
+  if(Math.max(winsHome,winsAway)!==required||scores.slice(0,-1).some((_,i)=>{const part=scores.slice(0,i+1);return part.filter(s=>s[0]>s[1]).length>=required||part.filter(s=>s[1]>s[0]).length>=required;}))return setAlert('Finish when one team wins '+required+' sets.',true);
+  const updates={sets:scores,home_score:winsHome,away_score:winsAway,status:'completed',updated_at:new Date().toISOString()};if(cfg.scoring_mode==='manual'&&m.stage==='regular'){const h=Number(f.get('awardHome')),a=Number(f.get('awardAway'));if(!Number.isInteger(h)||!Number.isInteger(a)||h<0||a<0)return setAlert('Enter valid standings points.',true);updates.awarded_home=h;updates.awarded_away=a;}
+  if(!confirm('Save this match result?'))return;cover.remove();action(()=>updateRecord('lhq_matches',m.id,updates),'Set scores and result saved.');
+ };
 };
 
 init();
