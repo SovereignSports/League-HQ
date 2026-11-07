@@ -2877,7 +2877,7 @@ function lhq18Page(){if(!ready())return emptySeason();const dates=lhq18ScopeDate
  <div class="card"><div class="row between"><h2>Scores awaiting approval (${lhq18Pending().length})</h2><span class="badge">Director only</span></div><p class="mini">QR entries do not affect official standings or championship advancement until approved. Director-entered scores remain final immediately.</p><div class="stack">${lhq18Pending().map(lhq18ScoreCard).join('')||'<div class="note success">No QR submissions awaiting review.</div>'}</div></div>
  <div class="card" style="margin-top:14px"><h2>Weekly scoresheet packet</h2><p class="mini">One landscape page per week, including every scheduled match, handwriting fields and date-scoped QR access in the same sheet. Print the whole season in one operation.</p><label class="field"><span class="label">Week to print</span><select id="lhq183Week">${lhq183Weeks().map(w=>`<option value="${w.key}">${esc(w.title)} · ${w.matches.length} matches</option>`).join('')}</select></label><div class="actions"><button class="btn primary" id="lhq183PrintSeason" ${!lhq183Weeks().length?'disabled':''}>Prepare & preview full season packet</button><button class="btn" id="lhq183PrintWeek" ${!lhq183Weeks().length?'disabled':''}>Prepare selected week</button></div><p class="mini">Preparing the packet securely issues an access code for each scheduled date. Codes are printed on that date's weekly sheet and expire after its playing date. QR submissions stay pending until Director approval. Keep printed packets secure.</p><div id="lhq183PacketStatus" role="status" class="mini"></div><details class="flow17-details"><summary>Advanced · Individual court QR and legacy prints</summary><label class="field"><span class="label">Scheduled date</span><select id="lhq18Date">${dates.map(d=>`<option value="${esc(d)}" ${d===lhq18.day?'selected':''}>${esc(d)}</option>`).join('')}</select></label><label class="field"><span class="label">Court scope</span><select id="lhq18Court"><option value="">All courts</option>${courts.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></label><div class="actions"><button class="btn" id="lhq18Issue">Issue individual QR</button><button class="btn ghost" id="lhq18Print">Preview older date-based scoresheets</button></div></details></div>
  ${issued&&issued.date===lhq18.day&&issued.season===state.seasonId?`<div class="card lhq18-qr-sheet" style="margin-top:14px"><h2>Scorekeeper QR · ${esc(issued.date)} ${issued.court?' · '+esc(issued.court):' · All courts'}</h2><div style="text-align:center">${lhq18QrSVG(issued.url)}</div><p class="mini" style="overflow-wrap:anywhere;text-align:center">${esc(issued.url)}</p><div class="actions"><button class="btn" id="lhq18CopyLink">Copy link</button><button class="btn primary" id="lhq18PrintQr">Preview / Print QR sheet</button></div><p class="mini">Anyone holding this code can submit pending scores for this scope. Keep folders secure; revoke a missing code.</p></div>`:''}
- <div class="card" style="margin-top:14px"><h2>Issued access codes</h2><div class="stack">${lhq18.tokens.filter(t=>t.season_id===state.seasonId).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,35).map(t=>`<div class="row between item"><div><strong>${esc(t.scope_date)} · ${esc(t.court||'All courts')}</strong><span class="mini">${t.revoked_at?'Revoked':new Date(t.expires_at)<new Date()?'Expired':'Active'} · Issued ${new Date(t.created_at).toLocaleString()}</span></div>${!t.revoked_at?`<button class="btn danger" data-lhq18-revoke="${esc(t.id)}">Revoke</button>`:''}</div>`).join('')||'<p class="mini">No QR codes issued.</p>'}</div></div>
+ <div class="card" style="margin-top:14px"><h2>Access code history & older credentials</h2><p class="mini">Active codes are managed above. This history includes expired or revoked credentials.</p><div class="stack">${lhq18.tokens.filter(t=>t.season_id===state.seasonId).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,35).map(t=>`<div class="row between item"><div><strong>${esc(t.scope_date)} · ${esc(t.court||'All courts')}</strong><span class="mini">${t.revoked_at?'Revoked':new Date(t.expires_at)<new Date()?'Expired':'Active'} · Issued ${new Date(t.created_at).toLocaleString()}</span></div>${!t.revoked_at?`<button class="btn danger" data-lhq18-revoke="${esc(t.id)}">Revoke</button>`:''}</div>`).join('')||'<p class="mini">No QR codes issued.</p>'}</div></div>
  <div class="card" style="margin-top:14px"><h2>Recent official score changes</h2><p class="mini">Director-only audit history. QR submissions and decisions remain in the approval log above.</p><div class="stack">${lhq18.audit.filter(a=>a.season_id===state.seasonId).sort((a,b)=>b.changed_at.localeCompare(a.changed_at)).slice(0,12).map(a=>`<div class="item mini"><strong>${a.source==='bracket'?'Championship bracket revised':'Match result revised'}</strong> · ${new Date(a.changed_at).toLocaleString()}<div class="muted">Record: ${esc(a.record_id)}</div></div>`).join('')||'<p class="mini">No official score changes logged since M15 installation.</p>'}</div></div>`;
 }
 async function lhq18Reload(){const [tokens,subs,audit]=await Promise.all([query('lhq_score_tokens'),query('lhq_score_submissions'),query('lhq_score_audit')]);lhq18.tokens=tokens;lhq18.submissions=subs;lhq18.audit=audit;}
@@ -3122,6 +3122,66 @@ const lhq183PrevWire=lhq18Wire;
 lhq18Wire=function(){lhq183PrevWire();const all=$('lhq183PrintSeason'),single=$('lhq183PrintWeek');if(all)all.onclick=()=>lhq183PrintPacket(true);if(single)single.onclick=()=>lhq183PrintPacket(false)};
 const lhq183PrevReset=reset;
 reset=function(){lhq183PrevReset();lhq183.links.clear();lhq183.busy=false};
+
+
+// v1.8.5 — Make active QR credentials immediately visible and revocable.
+// Reuse the director-authorized M15 revoke RPC, without new database privileges.
+function lhq185ActiveTokens(){
+ const now=Date.now();
+ return lhq18.tokens.filter(t=>t.season_id===state.seasonId && !t.revoked_at && Date.parse(t.expires_at)>now)
+   .sort((a,b)=>String(a.scope_date).localeCompare(String(b.scope_date)) || String(a.created_at).localeCompare(String(b.created_at)));
+}
+function lhq185ManagementPanel(){
+ const active=lhq185ActiveTokens();
+ return `<section class="card" id="lhq185QrAccess" style="margin-top:14px;border:2px solid var(--line,#cbd5e1)">
+ <div class="row between" style="gap:12px;align-items:center;flex-wrap:wrap"><div><h2>Manage active scoring QR codes</h2><p class="mini">${active.length} active code(s) for this season. Each code grants restricted score submission access until its expiration or revocation.</p></div>
+ ${active.length?`<button class="btn danger" id="lhq185RevokeAll" type="button">Revoke all ${active.length} active QR codes</button>`:''}</div>
+ <div class="stack">${active.map(t=>`<div class="item row between" style="gap:12px;flex-wrap:wrap" data-lhq185-item="${esc(t.id)}"><div><strong>${esc(String(t.scope_date).slice(0,10))} · ${esc(t.court||'All courts')}</strong><div class="mini">Expires ${esc(new Date(t.expires_at).toLocaleString())} · Issued ${esc(new Date(t.created_at).toLocaleString())}</div></div><button class="btn danger" type="button" data-lhq185-revoke="${esc(t.id)}">Revoke code</button></div>`).join('')||'<div class="note success">No active scoring QR codes for this season.</div>'}</div>
+ <p class="mini">Revocation immediately disables future submissions from that code. It does not delete paper sheets, already submitted pending scores, approved results or audit history.</p>
+ </section>`;
+}
+const lhq185PrevPage=lhq18Page;
+lhq18Page=function(){
+ const html=lhq185PrevPage();
+ const anchor='<div class="card" style="margin-top:14px"><h2>Weekly scoresheet packet';
+ return html.includes(anchor)?html.replace(anchor,lhq185ManagementPanel()+anchor):html;
+};
+const lhq185PrevWire=lhq18Wire;
+lhq18Wire=function(){
+ lhq185PrevWire();
+ async function revokeIds(ids){
+  let completed=0;
+  try{
+   for(const id of ids){
+    const {error}=await db.rpc('lhq_score_token_revoke',{p_token_id:id});
+    if(error)throw error;
+    completed++;
+    if(lhq18.issued?.id===id)lhq18.issued=null;
+    for(const [key,v] of lhq183.links)if(v?.id===id)lhq183.links.delete(key);
+   }
+   await lhq18Reload();render();
+   document.querySelector('#lhq185QrAccess')?.scrollIntoView({block:'start',behavior:'instant'});
+   setAlert(completed+' QR credential(s) revoked. Existing results preserved.');
+  }catch(e){
+   await lhq18Reload();render();
+   document.querySelector('#lhq185QrAccess')?.scrollIntoView({block:'start',behavior:'instant'});
+   setAlert('Revoked '+completed+' of '+ids.length+'. '+(e.message||String(e)),true);
+  }
+ }
+ document.querySelectorAll('[data-lhq185-revoke]').forEach(btn=>btn.onclick=()=>{
+  const token=lhq185ActiveTokens().find(t=>t.id===btn.dataset.lhq185Revoke);
+  if(!token)return setAlert('This code is no longer active.',true);
+  if(!confirm('Revoke QR for '+token.scope_date+' ('+(token.court||'all courts')+')? Existing scores and pending submissions will be preserved.'))return;
+  btn.disabled=true;revokeIds([token.id]);
+ });
+ const all=document.querySelector('#lhq185RevokeAll');
+ if(all)all.onclick=()=>{
+  const tokens=lhq185ActiveTokens();if(!tokens.length)return;
+  const answer=prompt('This will revoke all '+tokens.length+' active scoring QR codes in the selected season. To confirm, type REVOKE '+tokens.length+':','');
+  if(answer!==`REVOKE ${tokens.length}`)return;
+  all.disabled=true;revokeIds(tokens.map(t=>t.id));
+ };
+};
 
 init();
 </script></body></html>
