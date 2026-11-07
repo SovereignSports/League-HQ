@@ -150,7 +150,7 @@ $('root').innerHTML=`<div class="workspace-head"><div class="eyebrow">LEAGUE HQ 
 <button class="btn ghost" id="reload" title="Refresh league data">↻ Refresh</button></div>
 <div class="context-actions"><label class="row mini"><input type="checkbox" id="showArchived" ${state.archived?'checked':''}> Show archived records</label><span class="badge">${esc(selectedSeason()?.status||'No season selected')}</span></div></div>
 ${state.tab!=='overview'?`<div class="workspace-return"><button class="btn ghost" data-goto="overview" aria-label="Back to Director Hub">← Director Hub</button><span class="workspace-current">${esc(tabs.find(t=>t[0]===state.tab)?.[1]||'Workspace')}</span></div>`:''}
-<div id="alerts" style="margin-bottom:12px"></div><section id="content">${pageContent()}</section><div class="foot">League HQ v1.7.1 Date Format Correction Candidate · Director review required · All records remain in the independent League HQ Supabase project.</div>`;
+<div id="alerts" style="margin-bottom:12px"></div><section id="content">${pageContent()}</section><div class="foot">League HQ v1.7.7 Score Entry Continuity Candidate · Director review required · All records remain in the independent League HQ Supabase project.</div>`;
 wireBase();renderAlert();if(state.error)setAlert(state.error,true)}
 function pageContent(){if(state.tab==='leagues')return leaguesPage();if(state.tab==='seasons')return seasonsPage();if(state.tab==='players')return playersPage();if(state.tab==='playerhub')return '<div class="card"><h2>Player Hub · Planned</h2><p>The public Player Hub is deliberately not connected yet. Public standings, schedules and news will come after we create permission-safe publication views.</p><div class="note">Private player directory records remain director-only.</div></div>';return overviewPage()}
 function overviewPage(){const leagues=visibleLeagues(),seasons=visibleSeasons(),players=state.players.filter(p=>p.organization_id===state.orgId);return `<div class="hq-home-hero"><div class="eyebrow">ACTIVE WORKSPACE</div><h2>${esc(selectedLeague()?.name||'Choose a league')}</h2><p>${esc(selectedSeason()?.name||'Choose or create a season')} ${selectedSeason()?.starts_on?' · '+esc(selectedSeason().starts_on):''} ${selectedSeason()?.ends_on?'– '+esc(selectedSeason().ends_on):''}</p></div>
@@ -1295,7 +1295,25 @@ function flow175ScoreEditor(id){
   const updates={sets:outcome.scores,home_score:outcome.home,away_score:outcome.away,status:'completed',updated_at:new Date().toISOString()};
   if(manual){const h=String(new FormData(form).get('awardHome')??''),a=String(new FormData(form).get('awardAway')??'');if(!/^\d+$/.test(h)||!/^\d+$/.test(a)||Number(h)>10000||Number(a)>10000){error.textContent='Enter valid director-awarded standings points.';error.hidden=false;return;}updates.awarded_home=Number(h);updates.awarded_away=Number(a);}
   if(!confirm(`Save ${home} ${outcome.home}–${outcome.away} ${away} (${outcome.scores.length} set${outcome.scores.length===1?'':'s'})?`))return;
-  close();action(()=>updateRecord('lhq_matches',m.id,updates),'Match scores saved. Standings will update from the recorded sets.');
+  // Keep the edited match at the same screen position during batch score entry.
+  const source=document.querySelector(`[data-score-match="${CSS.escape(m.id)}"]`);
+  const anchorTop=source?.getBoundingClientRect().top??null;
+  const scrollBefore=window.scrollY;
+  close();
+  flow177ScoreSaveActive=true;
+  action(()=>updateRecord('lhq_matches',m.id,updates),'Match scores saved. Standings will update from the recorded sets.')
+   .finally(()=>{
+     flow177ScoreSaveActive=false;
+     render();
+     requestAnimationFrame(()=>{
+       const restored=document.querySelector(`[data-score-match="${CSS.escape(m.id)}"]`);
+       if(restored&&anchorTop!==null){
+         window.scrollTo({top:window.scrollY+restored.getBoundingClientRect().top-anchorTop,behavior:'instant'});
+       }else{
+         window.scrollTo({top:scrollBefore,behavior:'instant'});
+       }
+     });
+   });
  };
  cover.querySelector('#flow175h0')?.focus();
 }
@@ -1310,6 +1328,12 @@ matchCard=function(m){
  }
  return html;
 };
+
+// v1.7.7: During a score save, refresh all Supabase data without repeatedly
+// tearing down the displayed game list. Render once after the save completes.
+let flow177ScoreSaveActive=false;
+const flow177PriorRender=render;
+render=function(){if(flow177ScoreSaveActive)return;return flow177PriorRender();};
 
 init();
 </script></body></html>
