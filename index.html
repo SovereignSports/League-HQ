@@ -81,15 +81,15 @@ body #lhq18Printable.lhq18-preview{display:block;position:fixed;inset:0;z-index:
 .lhq183-fixtures .lhq183-write{font-weight:700;white-space:nowrap;letter-spacing:.25px;text-align:center!important}
 .lhq183-footer{display:flex;justify-content:space-between;gap:10px;padding-top:5px;border-top:1px solid #bac6d0;font-size:9px}
 .lhq183-note{padding:4px 6px;background:#fff9e6;border:1px solid #d7bb7e;font-size:10px;margin:4px 0}
-@media print{@page{size:letter landscape;margin:0.32in}#lhq18Printable .lhq18-preview-shell{padding:0!important}#lhq18Printable .lhq18-preview-content{padding:0!important}#lhq18Printable .lhq183-week{width:100%!important;height:auto;min-height:0;padding:0!important}#lhq18Printable .lhq183-session{break-inside:avoid-page}#lhq18Printable .lhq183-fixtures td,#lhq18Printable .lhq183-fixtures th{padding:1px 4px!important;font-size:9px!important}#lhq18Printable .lhq183-code svg{width:90px!important;height:90px!important;min-width:90px!important}}
+@media print{@page{size:letter portrait;margin:0.32in}#lhq18Printable .lhq18-preview-shell{padding:0!important}#lhq18Printable .lhq18-preview-content{padding:0!important}#lhq18Printable .lhq183-week{width:100%!important;height:auto;min-height:0;padding:0!important}#lhq18Printable .lhq183-session{break-inside:avoid-page}#lhq18Printable .lhq183-fixtures td,#lhq18Printable .lhq183-fixtures th{padding:1px 4px!important;font-size:9px!important}#lhq18Printable .lhq183-code svg{width:90px!important;height:90px!important;min-width:90px!important}}
 </style><style id="lhq184-print-fix">
 /* Print exactly one sheet per weekly section at US Letter landscape.
    Do not add a page break after the final week. */
 @media screen {
- #lhq18Printable .lhq183-week{width:10.36in;min-height:7.80in;margin:12px auto;padding:.12in;border:1px solid #bac6d0;box-shadow:0 2px 6px #0002;background:white}
+ #lhq18Printable .lhq183-week{width:7.92in;min-height:10.35in;margin:12px auto;padding:.12in;border:1px solid #bac6d0;box-shadow:0 2px 6px #0002;background:white}
 }
 @media print {
- @page { size: 11in 8.5in; margin: 0.28in; }
+ @page { size: 8.5in 11in; margin: 0.28in; }
  html,body{margin:0!important;padding:0!important;width:auto!important;height:auto!important;overflow:visible!important}
  body #lhq18Printable.lhq18-preview{position:static!important;inset:auto!important;overflow:visible!important;margin:0!important;padding:0!important;background:white!important;width:auto!important}
  #lhq18Printable .lhq18-preview-shell,#lhq18Printable .lhq18-preview-content{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:white!important;box-shadow:none!important}
@@ -106,6 +106,51 @@ body #lhq18Printable.lhq18-preview{display:block;position:fixed;inset:0;z-index:
  #lhq18Printable .lhq183-fixtures tr{height:auto!important;break-inside:avoid!important}
  #lhq18Printable .lhq183-fixtures th,#lhq18Printable .lhq183-fixtures td{padding:1px 3px!important;font-size:8px!important;line-height:1.05!important}
  #lhq18Printable .lhq183-footer{font-size:8px!important;padding-top:3px!important}
+}
+</style>
+<style id="lhq186-portrait-tournament-print">
+/* Tournament HQ-inspired navy/gold portrait official record. */
+#lhq18Printable .lhq183-week{font-family:Arial,Helvetica,sans-serif;color:#142942;background:#fff;border:0}
+#lhq18Printable .lhq183-week-head{background:#132a4b;color:#fff!important;border-bottom:4px solid #c8a057;padding:10px 11px!important;margin-bottom:8px!important;align-items:center}
+#lhq18Printable .lhq186-brand{font-size:10px;font-weight:900;letter-spacing:1.4px;color:#f0cf80}
+#lhq18Printable .lhq186-brand span{color:#cbd7ea;font-size:8px;margin-left:8px;letter-spacing:.6px}
+#lhq18Printable .lhq183-week-head h2{font-size:17px;color:#fff!important;line-height:1.18;margin:4px 0!important}
+#lhq18Printable .lhq186-subtitle{font-weight:700;color:#f0cf80;font-size:9px;letter-spacing:.55px;margin:3px 0!important}
+#lhq18Printable .lhq186-edition{text-align:right;color:#e3eaf3;font-size:8px;line-height:1.5}
+#lhq18Printable .lhq183-session{margin:4px 0 9px;break-inside:avoid-page}
+#lhq18Printable .lhq183-session-bar{background:#edf2f8;border:1px solid #b7c5d9;border-left:4px solid #c8a057;padding:4px 7px;min-height:68px;box-sizing:border-box}
+#lhq18Printable .lhq183-session-label{color:#132a4b;font-size:10px;font-weight:900;line-height:1.3}
+#lhq18Printable .lhq186-match-count{font-size:8px;color:#7c5b20;margin-left:6px;white-space:nowrap}
+#lhq18Printable .lhq186-help{color:#5c6f86;font-size:8px;margin-top:4px}
+#lhq18Printable .lhq183-code{gap:6px;flex-shrink:0}
+#lhq18Printable .lhq183-code svg{width:74px!important;height:74px!important;min-width:74px!important;max-width:74px!important;background:#fff!important;border:3px solid #fff}
+#lhq18Printable .lhq183-code-note{max-width:90px;font-size:8px;color:#364e6a;line-height:1.25}
+#lhq18Printable .lhq183-code-note b{font-size:8px;color:#132a4b}
+#lhq18Printable .lhq183-fixtures{width:100%;table-layout:fixed;border-collapse:collapse;margin:3px 0 0!important}
+#lhq18Printable .lhq183-fixtures th{background:#132a4b;color:#fff!important;border:1px solid #59708a!important;font-size:8px;letter-spacing:.15px;line-height:1.2;padding:4px 2px!important}
+#lhq18Printable .lhq183-fixtures td{color:#172a42;border:1px solid #aebccf!important;font-size:9px;line-height:1.13;padding:5px 3px!important;vertical-align:middle}
+#lhq18Printable .lhq183-fixtures tbody tr:nth-child(even){background:#f3f6fa}
+#lhq18Printable .lhq183-fixtures .lhq183-write{font-size:10px;letter-spacing:0;font-weight:800;color:#243d5a;white-space:nowrap}
+#lhq18Printable .lhq186-target{font-size:7px;color:#6b7790;font-weight:400;letter-spacing:0}
+#lhq18Printable .lhq183-footer{border-top:2px solid #c8a057;color:#233c59;align-items:center;gap:8px;padding-top:6px;font-size:8px}
+#lhq18Printable .lhq183-week.lhq186-dense .lhq183-fixtures td{padding:3px 2px!important;font-size:8px!important}
+#lhq18Printable .lhq183-week.lhq186-ultradense .lhq183-fixtures td{padding:2px 2px!important;font-size:7.5px!important}
+#lhq18Printable .lhq183-week.lhq186-ultradense .lhq183-code svg{width:66px!important;height:66px!important;min-width:66px!important}
+@media screen {#lhq18Printable .lhq183-week{box-sizing:border-box;width:7.92in;min-height:10.35in;max-width:100%;margin:14px auto;padding:.16in;box-shadow:0 2px 10px #0002;border:1px solid #b8c6d8}}
+@media print {
+ @page{size:letter portrait;margin:0.28in}
+ html,body{margin:0!important;padding:0!important;overflow:visible!important}
+ #lhq18Printable .lhq183-week{display:block;box-sizing:border-box;width:100%!important;max-width:none!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;break-before:page;page-break-before:always;break-after:auto!important;page-break-after:auto!important;overflow:visible!important}
+ #lhq18Printable .lhq183-week:first-child{break-before:auto;page-break-before:auto}
+ #lhq18Printable .lhq183-week-head{padding:7px 9px!important;margin:0 0 5px!important}
+ #lhq18Printable .lhq183-week-head h2{font-size:15px!important}
+ #lhq18Printable .lhq183-session{margin:3px 0 6px!important}
+ #lhq18Printable .lhq183-session-bar{padding:2px 6px!important;min-height:63px}
+ #lhq18Printable .lhq183-code svg{width:70px!important;height:70px!important;min-width:70px!important}
+ #lhq18Printable .lhq183-fixtures th{padding:3px 2px!important}
+ #lhq18Printable .lhq183-fixtures td{padding:3px 2px!important;font-size:8.5px!important}
+ #lhq18Printable .lhq183-footer{padding-top:4px!important}
+ #lhq18Printable .lhq183-week.lhq186-dense .lhq183-fixtures td{padding:2px 2px!important}
 }
 </style></head><body><header class="top"><div class="shell"><div class="brand"><span class="mark">♛</span>LEAGUE HQ<small>DIRECTOR + PLAYER HUB</small></div><div class="row"><span id="who" class="mini muted"></span><button id="logout" class="btn ghost hide">Sign out</button></div></div></header><main id="root" class="shell"><div class="card">Connecting…</div></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script id="lhq184-qr-bundled">
 /* MIT-licensed QRCode implementation (Kazuhiko Arase); bundled locally so tokens never leave the browser. */
@@ -2875,7 +2920,7 @@ function lhq18Page(){if(!ready())return emptySeason();const dates=lhq18ScopeDate
  const dayMatches=seasonRows('matches').filter(m=>m.match_date===lhq18.day),courts=[...new Set(dayMatches.map(m=>m.court))].filter(Boolean).sort();const issued=lhq18.issued;
  return `<div class="workspace-head"><div class="eyebrow">SEASON OPERATIONS</div><h1>Scorekeeping & Print Center</h1><p>Paper scoresheets, restricted QR access, and director-reviewed results. QR scorekeepers cannot access Director Hub data.</p></div>
  <div class="card"><div class="row between"><h2>Scores awaiting approval (${lhq18Pending().length})</h2><span class="badge">Director only</span></div><p class="mini">QR entries do not affect official standings or championship advancement until approved. Director-entered scores remain final immediately.</p><div class="stack">${lhq18Pending().map(lhq18ScoreCard).join('')||'<div class="note success">No QR submissions awaiting review.</div>'}</div></div>
- <div class="card" style="margin-top:14px"><h2>Weekly scoresheet packet</h2><p class="mini">One landscape page per week, including every scheduled match, handwriting fields and date-scoped QR access in the same sheet. Print the whole season in one operation.</p><label class="field"><span class="label">Week to print</span><select id="lhq183Week">${lhq183Weeks().map(w=>`<option value="${w.key}">${esc(w.title)} · ${w.matches.length} matches</option>`).join('')}</select></label><div class="actions"><button class="btn primary" id="lhq183PrintSeason" ${!lhq183Weeks().length?'disabled':''}>Prepare & preview full season packet</button><button class="btn" id="lhq183PrintWeek" ${!lhq183Weeks().length?'disabled':''}>Prepare selected week</button></div><p class="mini">Preparing the packet securely issues an access code for each scheduled date. Codes are printed on that date's weekly sheet and expire after its playing date. QR submissions stay pending until Director approval. Keep printed packets secure.</p><div id="lhq183PacketStatus" role="status" class="mini"></div><details class="flow17-details"><summary>Advanced · Individual court QR and legacy prints</summary><label class="field"><span class="label">Scheduled date</span><select id="lhq18Date">${dates.map(d=>`<option value="${esc(d)}" ${d===lhq18.day?'selected':''}>${esc(d)}</option>`).join('')}</select></label><label class="field"><span class="label">Court scope</span><select id="lhq18Court"><option value="">All courts</option>${courts.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></label><div class="actions"><button class="btn" id="lhq18Issue">Issue individual QR</button><button class="btn ghost" id="lhq18Print">Preview older date-based scoresheets</button></div></details></div>
+ <div class="card" style="margin-top:14px"><h2>Weekly scoresheet packet</h2><p class="mini">One portrait page per week, including every scheduled match, handwriting fields and date-scoped QR access in the same sheet. Print the whole season in one operation.</p><label class="field"><span class="label">Week to print</span><select id="lhq183Week">${lhq183Weeks().map(w=>`<option value="${w.key}">${esc(w.title)} · ${w.matches.length} matches</option>`).join('')}</select></label><div class="actions"><button class="btn primary" id="lhq183PrintSeason" ${!lhq183Weeks().length?'disabled':''}>Prepare & preview full season packet</button><button class="btn" id="lhq183PrintWeek" ${!lhq183Weeks().length?'disabled':''}>Prepare selected week</button></div><p class="mini">Preparing the packet securely issues an access code for each scheduled date. Codes are printed on that date's weekly sheet and expire after its playing date. QR submissions stay pending until Director approval. Keep printed packets secure.</p><div id="lhq183PacketStatus" role="status" class="mini"></div><details class="flow17-details"><summary>Advanced · Individual court QR and legacy prints</summary><label class="field"><span class="label">Scheduled date</span><select id="lhq18Date">${dates.map(d=>`<option value="${esc(d)}" ${d===lhq18.day?'selected':''}>${esc(d)}</option>`).join('')}</select></label><label class="field"><span class="label">Court scope</span><select id="lhq18Court"><option value="">All courts</option>${courts.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></label><div class="actions"><button class="btn" id="lhq18Issue">Issue individual QR</button><button class="btn ghost" id="lhq18Print">Preview older date-based scoresheets</button></div></details></div>
  ${issued&&issued.date===lhq18.day&&issued.season===state.seasonId?`<div class="card lhq18-qr-sheet" style="margin-top:14px"><h2>Scorekeeper QR · ${esc(issued.date)} ${issued.court?' · '+esc(issued.court):' · All courts'}</h2><div style="text-align:center">${lhq18QrSVG(issued.url)}</div><p class="mini" style="overflow-wrap:anywhere;text-align:center">${esc(issued.url)}</p><div class="actions"><button class="btn" id="lhq18CopyLink">Copy link</button><button class="btn primary" id="lhq18PrintQr">Preview / Print QR sheet</button></div><p class="mini">Anyone holding this code can submit pending scores for this scope. Keep folders secure; revoke a missing code.</p></div>`:''}
  <div class="card" style="margin-top:14px"><h2>Access code history & older credentials</h2><p class="mini">Active codes are managed above. This history includes expired or revoked credentials.</p><div class="stack">${lhq18.tokens.filter(t=>t.season_id===state.seasonId).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,35).map(t=>`<div class="row between item"><div><strong>${esc(t.scope_date)} · ${esc(t.court||'All courts')}</strong><span class="mini">${t.revoked_at?'Revoked':new Date(t.expires_at)<new Date()?'Expired':'Active'} · Issued ${new Date(t.created_at).toLocaleString()}</span></div>${!t.revoked_at?`<button class="btn danger" data-lhq18-revoke="${esc(t.id)}">Revoke</button>`:''}</div>`).join('')||'<p class="mini">No QR codes issued.</p>'}</div></div>
  <div class="card" style="margin-top:14px"><h2>Recent official score changes</h2><p class="mini">Director-only audit history. QR submissions and decisions remain in the approval log above.</p><div class="stack">${lhq18.audit.filter(a=>a.season_id===state.seasonId).sort((a,b)=>b.changed_at.localeCompare(a.changed_at)).slice(0,12).map(a=>`<div class="item mini"><strong>${a.source==='bracket'?'Championship bracket revised':'Match result revised'}</strong> · ${new Date(a.changed_at).toLocaleString()}<div class="muted">Record: ${esc(a.record_id)}</div></div>`).join('')||'<p class="mini">No official score changes logged since M15 installation.</p>'}</div></div>`;
@@ -3087,13 +3132,13 @@ function lhq183WeekHTML(week){
  const sections=byDate.map(({date,matches})=>{
   const link=lhq183.links.get(state.seasonId+':'+date);
   if(!link)throw Error('QR link unavailable for '+date+'. Prepare packet again.');
-  const table=`<table class="lhq183-fixtures"><colgroup><col style="width:10%"><col style="width:7%"><col style="width:28%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:16%"></colgroup><thead><tr><th>Time</th><th>Court</th><th>Match</th><th>Set 1</th><th>Set 2</th><th>Set 3</th><th>Verified</th></tr></thead><tbody>${matches.map(m=>{
-   const spec=flow175Spec(m);const target=spec.targets||[];const fields=[0,1,2].map(i=>i<target.length?`<td class="lhq183-write">___ – ___<div style="font:8px Arial;color:#555">to ${target[i]}</div></td>`:'<td style="background:#f3f3f3">—</td>').join('');
+  const table=`<table class="lhq183-fixtures"><colgroup><col style="width:10%"><col style="width:7%"><col style="width:28%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:16%"></colgroup><thead><tr><th>Time</th><th>Court</th><th>Match</th><th>SET 1</th><th>SET 2</th><th>SET 3</th><th>Initials</th></tr></thead><tbody>${matches.map(m=>{
+   const spec=flow175Spec(m);const target=spec.targets||[];const fields=[0,1,2].map(i=>i<target.length?`<td class="lhq183-write">___ – ___<div class="lhq186-target">TO ${target[i]}</div></td>`:'<td style="background:#f3f3f3">—</td>').join('');
    return `<tr><td>${esc(String(m.start_time||'').slice(0,5))}</td><td>${esc(String(m.court||''))}</td><td><b>${esc(teamName(m.home_team_id))}</b> vs <b>${esc(teamName(m.away_team_id))}</b>${spec.allSets?' <small>· all sets</small>':''}</td>${fields}<td>______</td></tr>`;
   }).join('')}</tbody></table>`;
-  return `<section class="lhq183-session"><div class="lhq183-session-bar"><div><div class="lhq183-session-label">${esc(dateLabel(date))} · ${matches.length} matches</div><div style="font-size:9px">Score all scheduled sets on paper, or scan to select a match for digital submission.</div></div><div class="lhq183-code">${lhq18QrSVG(link.url)}<div class="lhq183-code-note"><b>SCAN TO ENTER SCORES</b>Date-specific limited access<br>Director approval required</div></div></div>${table}</section>`;
+  return `<section class="lhq183-session"><div class="lhq183-session-bar"><div><div class="lhq183-session-label">${esc(dateLabel(date))} <span class="lhq186-match-count">${matches.length} MATCHES</span></div><div class="lhq186-help">Record scores on paper · scan QR to submit digitally</div></div><div class="lhq183-code">${lhq18QrSVG(link.url)}<div class="lhq183-code-note"><b>SCAN TO ENTER SCORES</b>Date-specific limited access<br>Director approval required</div></div></div>${table}</section>`;
  }).join('');
- return `<article class="lhq183-week"><header class="lhq183-week-head"><div><div style="font-size:9px;font-weight:700;letter-spacing:.6px">SOVEREIGN SPORTS · LEAGUE HQ</div><h2>${esc(selectedLeague()?.name||'League')} · ${esc(selectedSeason()?.name||'Season')}</h2><p><b>${esc(week.title)} · Official Scoresheet</b></p></div><div style="font-size:9px;text-align:right">Original paper record<br>Retain for Director review<br>${week.matches.length} matches</div></header>${sections}<footer class="lhq183-footer"><span>Scorekeeper name / initials: _____________________</span><span>Director verification: _____________________</span><span>QR scores remain pending until approved.</span></footer></article>`;
+ return `<article class="lhq183-week ${week.matches.length>24?'lhq186-ultradense':week.matches.length>14?'lhq186-dense':''}"><header class="lhq183-week-head"><div><div class="lhq186-brand">♛ SOVEREIGN SPORTS <span>LEAGUE HQ</span></div><h2>${esc(selectedLeague()?.name||'League')} · ${esc(selectedSeason()?.name||'Season')}</h2><p class="lhq186-subtitle">${esc(week.title)} · OFFICIAL MATCH SCORESHEET</p></div><div class="lhq186-edition">OFFICIAL SCORE RECORD<br><b>${week.matches.length} matches</b><br>Retain for verification</div></header>${sections}<footer class="lhq183-footer"><span>Scorekeeper name / initials: _____________________</span><span>Director verification: _____________________</span><span>QR scores remain pending until approved.</span></footer></article>`;
 }
 async function lhq183PrintPacket(all){
  if(lhq183.busy)return;
