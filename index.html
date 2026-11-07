@@ -152,6 +152,19 @@ body #lhq18Printable.lhq18-preview{display:block;position:fixed;inset:0;z-index:
  #lhq18Printable .lhq183-footer{padding-top:4px!important}
  #lhq18Printable .lhq183-week.lhq186-dense .lhq183-fixtures td{padding:2px 2px!important}
 }
+</style><style id="lhq187-championship-print">
+/* Championship pages reuse the weekly portrait Tournament HQ print language. */
+#lhq18Printable .lhq187-round .lhq187-table td{vertical-align:middle}
+#lhq18Printable .lhq187-round .lhq187-table .lhq187-status{font-size:8px;color:#334c6a}
+#lhq18Printable .lhq187-round .lhq187-sub,#lhq18Printable .lhq187-round .lhq187-vs{font-size:7px;color:#66758e;font-weight:normal}
+#lhq18Printable .lhq187-round .lhq187-initials{font-size:8px;margin-top:4px}
+#lhq18Printable .lhq187-noqr{padding:7px;border:1px dashed #8696ac;color:#64748b;font-size:9px;line-height:1.3}
+@media print{
+ #lhq18Printable .lhq187-round{page-break-before:always;break-before:page;page-break-after:auto;break-after:auto}
+ #lhq18Printable .lhq187-round:first-child{page-break-before:auto;break-before:auto}
+ #lhq18Printable .lhq187-round .lhq187-table td{padding:6px 3px!important}
+ #lhq18Printable .lhq187-round.lhq186-dense .lhq187-table td{padding:3px 2px!important}
+}
 </style></head><body><header class="top"><div class="shell"><div class="brand"><span class="mark">♛</span>LEAGUE HQ<small>DIRECTOR + PLAYER HUB</small></div><div class="row"><span id="who" class="mini muted"></span><button id="logout" class="btn ghost hide">Sign out</button></div></div></header><main id="root" class="shell"><div class="card">Connecting…</div></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script id="lhq184-qr-bundled">
 /* MIT-licensed QRCode implementation (Kazuhiko Arase); bundled locally so tokens never leave the browser. */
 (function(root){
@@ -3227,6 +3240,87 @@ lhq18Wire=function(){
   all.disabled=true;revokeIds(tokens.map(t=>t.id));
  };
 };
+
+// League HQ v1.8.7 — portrait championship packet, integrated with existing Print Center.
+// This is a print-only extension; bracket data and approved scores are not mutated.
+const lhq187={busy:false};
+function lhq187Sessions(){
+ return (typeof flow17Sessions==='function'?flow17Sessions():[]).filter(s=>s.session_kind==='championship').sort((a,b)=>String(a.session_date).localeCompare(String(b.session_date)));
+}
+function lhq187Bracket(){const record=compBracket();return record?.bracket?.rounds?.length?record:null}
+function lhq187RoundName(record,ri,round){
+ const final=record.bracket.rounds.length-1;
+ if(record.format==='double'){
+  const kinds=round.map(g=>String(g.kind||''));
+  if(kinds.includes('final_reset'))return 'Deciding Final';
+  if(kinds.includes('grand_final'))return 'Grand Final';
+  const unique=[...new Set(kinds.filter(Boolean))];
+  if(unique.length===1&&/winner/i.test(unique[0]))return 'Winners Bracket · Wave '+(ri+1);
+  if(unique.length===1&&/loser/i.test(unique[0]))return 'Elimination Bracket · Wave '+(ri+1);
+  return 'Championship · Wave '+(ri+1);
+ }
+ return ri===final?'Championship Final':ri===final-1?'Semifinals':'Round '+(ri+1);
+}
+function lhq187GameName(id){return id?teamName(id):'To be determined'}
+function lhq187RoundHTML(record,ri,date,code){
+ const rounds=record.bracket.rounds,round=rounds[ri]||[];
+ const known=round.filter(g=>g.home&&g.away).length;
+ const label=lhq187RoundName(record,ri,round);
+ const rows=round.map((g,j)=>{
+  const ready=!!(g.home&&g.away&&!g.winner&&g.rules);
+  const hasTeams=!!(g.home&&g.away);
+  let rule=null;
+  try{rule=flow178Rules(record,ri,g)}catch(_){}
+  const targets=rule?.targets||[];
+  const fields=[0,1,2,3,4].slice(0,Math.min(3,Math.max(targets.length,1))).map((_,i)=>i<targets.length?`<td class="lhq183-write">___ – ___<div class="lhq186-target">TO ${targets[i]}</div></td>`:'<td>—</td>').join('');
+  const full=record.format==='double'?' · '+esc(String(g.kind||'Bracket match').replaceAll('_',' ')):'';
+  const status=g.winner?'Completed':!hasTeams?'Awaiting progression':ready?'QR ready':'Save scoring rules for QR';
+  return `<tr><td><b>${esc(g.id||'Match '+(j+1))}</b>${full?`<div class="lhq187-sub">${full}</div>`:''}</td><td><b>${esc(lhq187GameName(g.home))}</b><br><span class="lhq187-vs">vs.</span> <b>${esc(lhq187GameName(g.away))}</b></td>${fields}<td class="lhq187-status">${esc(status)}<div class="lhq187-initials">Initials: ______</div></td></tr>`;
+ }).join('');
+ const qr=code?`<div class="lhq183-code">${lhq18QrSVG(code.url)}<div class="lhq183-code-note"><b>SCAN TO SUBMIT</b>Known, unplayed matchups only<br>Director approval required</div></div>`:'<div class="lhq187-noqr">NO QR CREDENTIAL<br>Paper record only</div>';
+ return `<article class="lhq183-week lhq187-round ${round.length>9?'lhq186-dense':''}"><header class="lhq183-week-head"><div><div class="lhq186-brand">♛ SOVEREIGN SPORTS <span>LEAGUE HQ</span></div><h2>${esc(selectedLeague()?.name||'League')} · ${esc(selectedSeason()?.name||'Season')}</h2><p class="lhq186-subtitle">CHAMPIONSHIP · ${esc(label)}</p></div><div class="lhq186-edition">OFFICIAL BRACKET SCORESHEET<br><b>${round.length} matches</b><br>Retain for verification</div></header><section class="lhq183-session"><div class="lhq183-session-bar"><div><div class="lhq183-session-label">${esc(date)} · ${esc(label)} <span class="lhq186-match-count">${known}/${round.length} MATCHUPS KNOWN</span></div><div class="lhq186-help">Record paper scores, then submit digitally when the matchup and match rules are confirmed.</div></div>${qr}</div><table class="lhq183-fixtures lhq187-table"><colgroup><col style="width:17%"><col style="width:31%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:16%"></colgroup><thead><tr><th>Match</th><th>Teams</th><th>SET 1</th><th>SET 2</th><th>SET 3</th><th>Status / verification</th></tr></thead><tbody>${rows||'<tr><td colspan="6">No matches in this bracket wave</td></tr>'}</tbody></table></section><footer class="lhq183-footer"><span>Scorekeeper: ____________________</span><span>Director verified: ____________________</span><span>QR submissions require Director approval.</span></footer></article>`;
+}
+function lhq187Controls(){
+ const record=lhq187Bracket();
+ const dates=lhq187Sessions();
+ const disabled=!record||!dates.length;
+ return `<div class="card" id="lhq187ChampPacket" style="margin-top:14px"><div class="row between"><h2>Championship scoresheet packet</h2><span class="badge">Portrait · Tournament HQ style</span></div><p class="mini">Print the current round or the complete bracket in the same format as your weekly packet. Later opponents appear as TBD; reprint as advancement determines matchups. QR scores always require Director approval.</p>${!record?'<div class="note">Generate a championship bracket first.</div>':''}${!dates.length?'<div class="note">Set a championship date in the schedule to enable restricted digital scoring.</div>':''}<label class="field"><span class="label">Championship date for scoring QR</span><select id="lhq187Date" ${!dates.length?'disabled':''}>${dates.map(s=>`<option value="${esc(String(s.session_date).slice(0,10))}">${esc(String(s.session_date).slice(0,10))}</option>`).join('')}</select></label><label class="field"><span class="label">Bracket page(s)</span><select id="lhq187Scope" ${!record?'disabled':''}><option value="current">Current playable wave</option><option value="all">All bracket waves (TBD placeholders included)</option></select></label><div class="actions"><button class="btn primary" id="lhq187Prepare" ${disabled?'disabled':''}>Preview championship packet</button></div><p class="mini">A date-specific QR is shared across printed championship pages; individual matches are selected after scanning. Only known, unplayed matches with director-saved scoring rules can be submitted. Earlier printed credentials remain active until revoked or expired.</p><div id="lhq187Status" class="mini" role="status"></div></div>`;
+}
+function lhq187CurrentWave(record){
+ const rounds=record.bracket.rounds;
+ const candidates=[];
+ for(let i=0;i<rounds.length;i++)if(rounds[i].some(g=>g.home&&g.away&&!g.winner))candidates.push(i);
+ if(candidates.length)return [candidates[0]];
+ const incomplete=rounds.findIndex(r=>r.some(g=>!g.winner));
+ return [incomplete<0?rounds.length-1:incomplete].filter(i=>i>=0);
+}
+async function lhq187Prepare(){
+ if(lhq187.busy)return;
+ const record=lhq187Bracket(),date=$('lhq187Date')?.value,scope=$('lhq187Scope')?.value;
+ if(!record||!date)return setAlert('Championship bracket and scheduled championship date are required.',true);
+ const rounds=scope==='all'?record.bracket.rounds.map((_,i)=>i):lhq187CurrentWave(record);
+ if(!rounds.length)return setAlert('No championship waves to print.',true);
+ const key=state.seasonId+':'+date;
+ const cached=lhq183.links.get(key);
+ const existingValid=cached&&lhq18.tokens.some(t=>t.id===cached.id&&!t.revoked_at&&new Date(t.expires_at)>new Date());
+ if(cached&&!existingValid)lhq183.links.delete(key);
+ const fresh=!lhq183.links.has(key);
+ if(!confirm(`Prepare ${rounds.length} championship page(s) for ${date}?${fresh?'\nA new restricted date-specific QR credential will be issued.':''}\n\nMatchups and scoring rules may change as the bracket progresses. Reprint when necessary; old QR credentials remain valid until revoked or expired.`))return;
+ const btn=$('lhq187Prepare'),status=$('lhq187Status');lhq187.busy=true;if(btn)btn.disabled=true;
+ try{
+  if(status)status.textContent='Preparing championship pages and secure QR…';
+  const code=await lhq183IssueDate(date);
+  const html=rounds.map(i=>lhq187RoundHTML(record,i,date,code)).join('');
+  lhq18Print(html);
+  if(status)status.textContent='Championship packet prepared. Review and choose Print / Save PDF.';
+  await lhq18Reload();
+ }catch(e){setAlert('Championship packet could not be prepared: '+(e.message||String(e)),true);if(status)status.textContent='No complete packet prepared. Previously issued codes remain active.'}
+ finally{lhq187.busy=false;if(btn)btn.disabled=false;}
+}
+const lhq187PreviousPage=lhq18Page;
+lhq18Page=function(){const html=lhq187PreviousPage();const anchor='<div class="card" style="margin-top:14px"><h2>Access code history';return html.includes(anchor)?html.replace(anchor,lhq187Controls()+anchor):html+lhq187Controls();};
+const lhq187PreviousWire=lhq18Wire;
+lhq18Wire=function(){lhq187PreviousWire();const btn=$('lhq187Prepare');if(btn)btn.onclick=lhq187Prepare;};
 
 init();
 </script></body></html>
