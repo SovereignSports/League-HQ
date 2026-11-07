@@ -1335,5 +1335,176 @@ let flow177ScoreSaveActive=false;
 const flow177PriorRender=render;
 render=function(){if(flow177ScoreSaveActive)return;return flow177PriorRender();};
 
+// League HQ v1.7.8 — adaptive championship scoring and controlled result reversal.
+// Stored on lhq_championship_brackets.bracket JSON; no schema migration.
+function flow178Stage(record,ri,game){
+ const b=record.bracket,finalRound=b.rounds.length-1;
+ if(record.format==='double'){
+  if(game.kind==='grand_final'||game.kind==='final_reset')return 'final';
+  const losses=flow17DoubleLosses(b),alive=b.seeded.filter(id=>losses[id]<2).length;
+  if(alive<=4)return 'semi';
+  return ri<2?'early':'middle';
+ }
+ return ri===finalRound?'final':ri===finalRound-1?'semi':ri<2?'early':'middle';
+}
+function flow178Presets(){return {short:{best:3,targets:[15,15,15]},medium:{best:3,targets:[18,18,15]},full:{best:3,targets:[21,21,15]},single15:{best:1,targets:[15]},single18:{best:1,targets:[18]},single21:{best:1,targets:[21]}};}
+function flow178NormalizeRules(r){
+ if(!r||![1,3,5].includes(Number(r.best)))throw Error('Choose a single game, best of 3, or best of 5.');
+ const best=Number(r.best),targets=Array.isArray(r.targets)?r.targets.map(Number):[];
+ if(targets.length!==best||targets.some(x=>!Number.isInteger(x)||x<1||x>99))throw Error('Provide a valid target for every set (1–99).');
+ return {best,targets,allSets:false};
+}
+function flow178DefaultRules(record,ri,game){
+ const stage=flow178Stage(record,ri,game),preset=stage==='early'?'short':stage==='middle'?'medium':'full';
+ return {...flow178Presets()[preset],allSets:false};
+}
+function flow178Find(b,id){for(let ri=0;ri<(b.rounds||[]).length;ri++){const mi=b.rounds[ri].findIndex(g=>g.id===id);if(mi!==-1)return {ri,mi,game:b.rounds[ri][mi]};}return null;}
+function flow178Rules(record,ri,game){return flow178NormalizeRules(game.rules||record.bracket.round_rules?.[String(ri)]||flow178DefaultRules(record,ri,game));}
+function flow178RebuildSingle(b){
+ // Recalculate participant placement; never wipe the result being saved or corrected.
+ // Caller has already removed dependent downstream results when necessary.
+ for(let ri=1;ri<b.rounds.length;ri++)for(const g of b.rounds[ri]){g.home=null;g.away=null;}
+ b.champion=null;
+ for(let ri=0;ri<b.rounds.length;ri++)for(let mi=0;mi<b.rounds[ri].length;mi++){
+  const g=b.rounds[ri][mi];
+  if(ri===0&&!g.winner&&Boolean(g.home)!==Boolean(g.away))g.winner=g.home||g.away;
+  if(g.winner){
+   if(ri+1<b.rounds.length){const next=b.rounds[ri+1][Math.floor(mi/2)];next[mi%2?'away':'home']=g.winner;}
+   else b.champion=g.winner;
+  }
+ }
+}
+function flow178Cascade(b,record,ri){
+ const later=b.rounds.slice(ri+1),cleared=later.flat().filter(g=>g.winner||g.sets?.length).length;
+ if(record.format==='double'){
+  b.rounds=b.rounds.slice(0,ri+1);b.champion=null;
+ }else{
+  // Only dependent future rounds are removed. An earlier same-round score stays intact.
+  flow178RebuildSingle(b);
+ }
+ return cleared;
+}
+function flow178PreviewAffected(record,ri,mi){
+ const b=record.bracket;if(record.format==='double')return b.rounds.slice(ri+1).flat().filter(g=>g.winner||g.sets?.length).length;
+ let count=0,index=mi;
+ for(let r=ri+1;r<b.rounds.length;r++){
+  index=Math.floor(index/2);const g=b.rounds[r][index];
+  if(g&&(g.sets?.length||g.winner))count++;
+ }
+ return count;
+}
+function flow178ChangeResult(record,id,outcome,mode){
+ const b=structuredClone(record.bracket),found=flow178Find(b,id);if(!found)throw Error('Bracket match not found.');
+ const {ri,mi,game}=found;if(!game.home||!game.away)throw Error('Both participants must be known before entering a result.');
+ if(!['save','revoke'].includes(mode))throw Error('Unknown result operation.');
+ if(record.format==='double'&&ri!==b.rounds.length-1&&b.rounds.slice(ri+1).length&&mode==='save'&&!game.winner)throw Error('Cannot score an earlier unplayed double-elimination match after a later wave was generated.');
+ const later=flow178PreviewAffected(record,ri,mi);
+ if(record.format==='double'){
+  if(ri<b.rounds.length-1)b.rounds=b.rounds.slice(0,ri+1);
+  b.champion=null;
+ }else if(ri<b.rounds.length-1){
+  // Only descendants of the edited game are invalidated; independent branches retain scores.
+  let index=mi;
+  for(let i=ri+1;i<b.rounds.length;i++){
+   index=Math.floor(index/2);const g=b.rounds[i][index];
+   if(g){g.sets=[];g.winner=null;g.home=null;g.away=null;}
+  }
+  b.champion=null;
+ }
+ if(mode==='revoke'){
+  game.winner=null;game.sets=[];
+ }else{
+  game.sets=outcome.scores;
+  game.winner=outcome.home>outcome.away?game.home:game.away;
+ }
+ if(record.format==='double'){
+  if(mode==='save')flow17DoubleAdvance(b);
+ }else{
+  // Rebuild all downstream placements, without preserving stale downstream scores.
+  flow178RebuildSingle(b);
+ }
+ return {bracket:b,cleared:later};
+}
+function flow178ScoreDialog(id){
+ const record=compBracket();if(!record)return;
+ const find=flow178Find(record.bracket,id);if(!find)return;
+ const {ri,game}=find;if(!game.home||!game.away)return setAlert('Match participants are not ready.',true);
+ let rules;try{rules=flow178Rules(record,ri,game)}catch(e){return setAlert(e.message,true)}
+ const home=teamName(game.home),away=teamName(game.away),prior=checkedSets(game.sets);
+ document.querySelector('#flow178Cover')?.remove();
+ const cover=document.createElement('div');cover.id='flow178Cover';cover.className='modalcover';
+ cover.innerHTML=`<div class="modal flow175-modal" role="dialog" aria-modal="true" aria-labelledby="flow178Title">
+ <div class="row between"><div><h2 id="flow178Title">Championship match scores</h2><p class="mini muted">${esc(flow178Stage(record,ri,game))} · ${esc(game.kind||'single elimination')} · ${esc(game.id)}</p></div><button class="btn ghost" type="button" id="flow178Close">Close</button></div>
+ <form id="flow178Form"><label class="field"><span class="label">Match scoring preset</span><select id="flow178Preset"><option value="short">Short · 15/15/15</option><option value="medium">Medium · 18/18/15</option><option value="full">Full · 21/21/15</option><option value="single15">Single game · 15</option><option value="single18">Single game · 18</option><option value="single21">Single game · 21</option><option value="custom" selected>Custom / saved targets</option></select></label>
+ <div class="row" style="gap:10px;margin:10px 0"><label class="field" style="flex:1"><span class="label">Format</span><select name="best" id="flow178Best"><option value="1">Single game</option><option value="3">Best of 3</option><option value="5">Best of 5</option></select></label></div>
+ <div class="flow175-score-head" style="grid-template-columns: 78px 1fr 1fr 60px"><span>Set</span><strong>${esc(home)}</strong><strong>${esc(away)}</strong><span>Target</span></div>
+ <div id="flow178Rows"></div><p class="mini">Set targets are saved with this match. Changing later rounds does not rewrite completed scores.</p>
+ <div id="flow178Summary" class="flow175-summary" aria-live="polite"></div><div id="flow178Error" class="flow175-error" role="alert" hidden></div>
+ <div class="actions"><button class="btn primary" type="submit">${game.winner?'Correct result':'Save result & advance'}</button>${!game.winner?'<button class="btn ghost" id="flow178RulesOnly" type="button">Save match rules only</button>':''}${game.winner?'<button class="btn danger" id="flow178Revoke" type="button">Revoke result</button>':''}<button class="btn ghost" id="flow178Cancel" type="button">Cancel</button></div></form></div>`;
+ document.body.appendChild(cover);
+ const form=cover.querySelector('#flow178Form'),rows=cover.querySelector('#flow178Rows'),error=cover.querySelector('#flow178Error'),summary=cover.querySelector('#flow178Summary'),best=cover.querySelector('#flow178Best'),preset=cover.querySelector('#flow178Preset'),close=()=>cover.remove();
+ const values=Array.from({length:5},(_,i)=>prior[i]?[String(prior[i][0]),String(prior[i][1])]:['','']);
+ let targets=rules.targets.slice();best.value=String(rules.best);
+ function collect(){rows.querySelectorAll('[data-side]').forEach(el=>{values[Number(el.dataset.index)][Number(el.dataset.side)]=el.value});rows.querySelectorAll('[data-target]').forEach(el=>{targets[Number(el.dataset.target)]=Number(el.value)});}
+ function draw(){const n=Number(best.value);targets=Array.from({length:n},(_,i)=>targets[i]||((i===n-1&&n>1)?15:21));rows.innerHTML=targets.map((target,i)=>`<div class="flow175-score-row" style="grid-template-columns:78px 1fr 1fr 60px"><label class="flow175-set-label" for="flow178H${i}">Set ${i+1}</label><input id="flow178H${i}" data-index="${i}" data-side="0" type="number" min="0" max="999" inputmode="numeric" aria-label="Set ${i+1} ${esc(home)}" value="${esc(values[i][0])}"><input data-index="${i}" data-side="1" type="number" min="0" max="999" inputmode="numeric" aria-label="Set ${i+1} ${esc(away)}" value="${esc(values[i][1])}"><input data-target="${i}" aria-label="Set ${i+1} target" type="number" min="1" max="99" value="${target}"></div>`).join('');update()}
+ function update(){collect();const n=Number(best.value),part=values.slice(0,n).filter(p=>p[0]!==''&&p[1]!==''&&p[0]!==p[1]);const h=part.filter(p=>Number(p[0])>Number(p[1])).length;summary.textContent=`Sets recorded ${part.length}/${n} · ${home}: ${h} · ${away}: ${part.length-h}`;error.hidden=true;}
+ rows.addEventListener('input',update);
+ preset.onchange=()=>{collect();if(preset.value==='custom')return;const p=flow178Presets()[preset.value];best.value=String(p.best);targets=p.targets.slice();draw()};
+ best.onchange=()=>{collect();preset.value='custom';draw()};
+ rows.addEventListener('change',e=>{if(e.target.matches('[data-target]'))preset.value='custom'});
+ cover.querySelector('#flow178Close').onclick=close;cover.querySelector('#flow178Cancel').onclick=close;cover.addEventListener('click',e=>{if(e.target===cover)close()});
+ function confirmAffected(verb){const count=flow178PreviewAffected(record,ri,find.mi);return count?confirm(`${verb} will clear ${count} completed result(s) in later championship waves/rounds and rebuild their participants. Those scores cannot be recovered automatically. Continue?`):confirm(`${verb} this championship match?`)}
+ function persist(mode,outcome){if(!confirmAffected(mode==='revoke'?'Revoke':'Save'))return;let result;try{result=flow178ChangeResult(record,id,outcome,mode)}catch(e){error.textContent=e.message;error.hidden=false;return;}
+  // Match rules must be persisted with each scored match, even after later defaults change.
+  if(mode==='save'){const match=flow178Find(result.bracket,id).game;match.rules=flow178NormalizeRules({best:Number(best.value),targets});}
+  close();action(()=>compSaveBracket(result.bracket,record.version),mode==='revoke'?'Championship result revoked. Dependent rounds recalculated.':'Championship result saved. Bracket updated.');
+ }
+ form.onsubmit=e=>{e.preventDefault();collect();try{const validRules=flow178NormalizeRules({best:Number(best.value),targets});const outcome=flow175Evaluate(values.slice(0,validRules.best),{...validRules,needed:Math.ceil(validRules.best/2)});persist('save',outcome)}catch(e){error.textContent=e.message;error.hidden=false}};
+ const revoke=cover.querySelector('#flow178Revoke');if(revoke)revoke.onclick=()=>persist('revoke',null);
+ const rulesOnly=cover.querySelector('#flow178RulesOnly');if(rulesOnly)rulesOnly.onclick=()=>{
+  collect();let nextRules;try{nextRules=flow178NormalizeRules({best:Number(best.value),targets})}catch(e){error.textContent=e.message;error.hidden=false;return;}
+  if(!confirm(`Save ${nextRules.targets.join('/')} scoring rules for this unplayed match?`))return;
+  const bracket=structuredClone(record.bracket);flow178Find(bracket,id).game.rules=nextRules;
+  close();action(()=>compSaveBracket(bracket,record.version),'Championship match scoring rules saved.');
+ };
+ draw();cover.querySelector('#flow178H0')?.focus();
+}
+function flow178BulkRules(scope,id){
+ const record=compBracket();if(!record)return;
+ const found=flow178Find(record.bracket,id);if(!found)return;
+ let current;try{current=flow178Rules(record,found.ri,found.game)}catch(e){return setAlert(e.message,true)}
+ const cover=document.createElement('div');cover.id='flow178BulkCover';cover.className='modalcover';document.getElementById('flow178BulkCover')?.remove();
+ cover.innerHTML=`<div class="modal" role="dialog" aria-modal="true"><div class="row between"><h2>Change upcoming match rules</h2><button class="btn ghost" id="flow178BulkClose">Close</button></div><p class="mini">${scope==='wave'?'Only unplayed matches in this round/wave':'All unplayed championship matches'}. Completed results are protected.</p><label class="field"><span class="label">Scoring preset</span><select id="flow178BulkPreset"><option value="short">15 / 15 / 15</option><option value="medium">18 / 18 / 15</option><option value="full">21 / 21 / 15</option><option value="single15">Single game to 15</option><option value="single18">Single game to 18</option><option value="single21">Single game to 21</option></select></label><div class="actions"><button class="btn primary" id="flow178BulkApply">Apply to unplayed matches</button><button class="btn ghost" id="flow178BulkCancel">Cancel</button></div></div>`;
+ document.body.appendChild(cover);const close=()=>cover.remove();cover.querySelector('#flow178BulkClose').onclick=close;cover.querySelector('#flow178BulkCancel').onclick=close;
+ cover.querySelector('#flow178BulkApply').onclick=()=>{const b=structuredClone(record.bracket),preset=flow178Presets()[cover.querySelector('#flow178BulkPreset').value];const games=(scope==='wave'?b.rounds[found.ri]:b.rounds.flat()).filter(g=>!g.winner&&!g.sets?.length);if(!games.length)return setAlert('No unplayed matches to change.',true);if(!confirm(`Apply ${preset.targets.join('/')} to ${games.length} unplayed match(es)? Completed results stay unchanged.`))return;
+ for(const g of games)g.rules=flow178NormalizeRules(preset);
+ close();action(()=>compSaveBracket(b,record.version),'Upcoming championship scoring rules updated.');
+ };
+}
+const flow178OldMarkup=compBracketMarkup;
+compBracketMarkup=function(){
+ const record=compBracket();if(!record)return flow178OldMarkup();
+ const b=record.bracket;if(!b?.rounds?.length)return flow178OldMarkup();
+ const double=record.format==='double';
+ const losses=double?flow17DoubleLosses(b):{};
+ return `<div class="row between"><span class="badge">${double?'Double':'Single'} elimination · Revision ${record.version}</span><strong>${b.champion?'Champion: '+esc(teamName(b.champion)):'Championship in progress'}</strong></div>
+ <p class="mini">Scoring targets are configurable per match. Correcting an earlier result requires confirmation before dependent later results are cleared.</p>
+ <div class="bracket-scroll"><div class="bracket-rounds">${b.rounds.map((round,ri)=>`<div class="bracket-round"><h3>${double?'Wave '+(ri+1):ri===b.rounds.length-1?'Final':ri===b.rounds.length-2?'Semifinals':'Round '+(ri+1)}</h3>
+ ${round.map(g=>{const rules=flow178Rules(record,ri,g),canScore=Boolean(g.home&&g.away);return `<div class="bracket-game"><div class="mini">${esc(g.kind?g.kind.replace(/_/g,' '):flow178Stage(record,ri,g))} · ${esc(rules.targets.join('/'))}</div>
+ <div class="row between"><strong>${esc(g.home?teamName(g.home):'TBD')}</strong><span>${g.sets?.filter(x=>x[0]>x[1]).length||''}</span></div>
+ <div class="row between"><strong>${esc(g.away?teamName(g.away):'BYE / TBD')}</strong><span>${g.sets?.filter(x=>x[1]>x[0]).length||''}</span></div>
+ ${g.sets?.length?`<p class="mini">${esc(g.sets.map(x=>x.join('–')).join(' · '))}</p>`:''}
+ ${g.winner?`<p class="mini">Winner: ${esc(teamName(g.winner))}</p>`:''}
+ ${canScore?`<button class="btn ghost" data-bracket-score="${esc(g.id)}">${g.sets?.length?'Correct / revoke result':'Enter scores'}</button>`:''}</div>`}).join('')}
+ ${round.length?`<button class="btn ghost" data-flow178-bulk="${esc(round[0].id)}" data-scope="wave">Change unplayed round rules</button>`:''}</div>`).join('')}</div></div>
+ ${double?`<p class="mini">Losses: ${b.seeded.map(id=>`${esc(teamName(id))}: ${losses[id]}`).join(' · ')}</p>`:''}
+ <div class="actions"><button class="btn ghost" data-flow178-bulk="${esc(b.rounds[0][0].id)}" data-scope="remaining">Change all currently unplayed rules</button><button class="btn danger" id="resetBracket">Reset bracket (confirmation)</button></div>`;
+};
+const flow178OldWire=wireBase;
+wireBase=function(){flow178OldWire();
+ document.querySelectorAll('[data-bracket-score]').forEach(el=>el.onclick=()=>flow178ScoreDialog(el.dataset.bracketScore));
+ document.querySelectorAll('[data-flow178-bulk]').forEach(el=>el.onclick=()=>flow178BulkRules(el.dataset.scope,el.dataset.flow178Bulk));
+};
+
 init();
 </script></body></html>
