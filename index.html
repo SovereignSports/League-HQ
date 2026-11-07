@@ -20,6 +20,15 @@
 /* League HQ v0.4.1 — Tournament HQ home-first navigation; no bottom tab bar. */
 .workspace-return{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}.workspace-return .btn{min-height:44px}.workspace-current{font-weight:850;color:var(--navy);font-size:17px}.shell{padding-bottom:35px}
 @media(max-width:620px){.shell{padding-bottom:32px}.workspace-return{margin:5px 0 14px}.workspace-return .btn{width:auto;flex:0 0 auto}}
+
+/* League HQ v1.7.9 — season champion announcement */
+.lhq-champion-announcement{position:relative;overflow:hidden;margin:14px 0 18px;padding:22px 24px;border:1px solid #c39b45;border-radius:16px;background:linear-gradient(120deg,#132a4b 0%,#203b65 58%,#453f53 100%);color:#fff;box-shadow:0 8px 22px rgba(19,42,75,.12);text-align:center}
+.lhq-champion-announcement::before,.lhq-champion-announcement::after{content:'✦';position:absolute;top:16px;color:#e2c477;font-size:25px;opacity:.9}
+.lhq-champion-announcement::before{left:18px}.lhq-champion-announcement::after{right:18px}
+.lhq-champion-announcement .lhq-champion-eyebrow{color:#ead8a7;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-bottom:8px}
+.lhq-champion-announcement .lhq-champion-title{font-size:clamp(20px,3.6vw,30px);font-weight:800;line-height:1.25;margin:0;color:#fff}
+.lhq-champion-announcement .lhq-champion-subtitle{font-size:clamp(14px,2.4vw,18px);font-weight:600;color:#f4d78d;margin-top:7px}
+@media(max-width:540px){.lhq-champion-announcement{padding:21px 32px}.lhq-champion-announcement::before,.lhq-champion-announcement::after{font-size:15px;top:10px}}
 </style><style id="league-hq-competition-css">
 .tablewrap {overflow-x:auto;margin:12px 0}.tablewrap table{width:100%;border-collapse:collapse;min-width:340px}.tablewrap th,.tablewrap td{padding:10px 7px;border-bottom:1px solid #e1e6ef;text-align:left;font-size:13px}.tablewrap th{background:#f5f7fa;color:#132a4b}
 .modalcover{position:fixed;inset:0;background:#142741bb;z-index:50;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 14px}.modal{max-width:600px;width:100%;margin:auto;background:#fff;border-radius:20px;padding:20px;box-shadow:0 20px 50px #10284455}.modal .field{margin:7px 0}.modal .split{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -1504,6 +1513,36 @@ const flow178OldWire=wireBase;
 wireBase=function(){flow178OldWire();
  document.querySelectorAll('[data-bracket-score]').forEach(el=>el.onclick=()=>flow178ScoreDialog(el.dataset.bracketScore));
  document.querySelectorAll('[data-flow178-bulk]').forEach(el=>el.onclick=()=>flow178BulkRules(el.dataset.scope,el.dataset.flow178Bulk));
+};
+
+
+// League HQ v1.7.9 — automatic champion celebration in both hubs.
+// Existing bracket.champion is the only source of truth; no duplicate announcement data.
+function lhqChampionBanner(team,season){
+ if(!team||!season)return '';
+ return `<section class="lhq-champion-announcement" role="status" aria-label="Season champions"><div class="lhq-champion-eyebrow">🏆 Season Champions</div><h2 class="lhq-champion-title">Congratulations to ${esc(team)}!</h2><div class="lhq-champion-subtitle">${esc(season)} Champions</div></section>`;
+}
+function lhqDirectorChampionBanner(){
+ const bracket=compBracket()?.bracket,season=selectedSeason();
+ if(!bracket?.champion||!season?.name)return '';
+ const team=seasonRows('teams').find(t=>t.id===bracket.champion);
+ return team?lhqChampionBanner(team.name,season.name):'';
+}
+const lhq179PrevOverview=overviewPage;
+overviewPage=function(){const html=lhq179PrevOverview();return lhqDirectorChampionBanner()+html;};
+const lhq179PrevChampionship=championshipPage;
+championshipPage=function(){const html=lhq179PrevChampionship();return lhqDirectorChampionBanner()+html;};
+const lhq179PrevPublicRender=renderPublic;
+renderPublic=function(){
+ lhq179PrevPublicRender();
+ if(!publicMode||publicState.loading||publicState.error)return;
+ const feed=publicState.feed,championId=feed?.championship?.champion;
+ if(!championId)return;
+ const team=feed?.teams?.find(t=>t.id===championId);
+ const banner=team?lhqChampionBanner(team.name,feed?.season?.name):'';
+ if(!banner)return;
+ const hero=document.querySelector('.public-hero');
+ if(hero)hero.insertAdjacentHTML('afterend',banner);
 };
 
 init();
