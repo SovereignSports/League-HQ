@@ -1628,5 +1628,107 @@ wireBase=function(){lhq18PrevWire();if(state.tab==='scorecenter')lhq18Wire();};
 const lhq18PrevAction=action;
 action=async function(fn,success){if(!['championship','scorecenter'].includes(state.tab))return lhq18PrevAction(fn,success);const y=window.scrollY;await lhq18PrevAction(fn,success);requestAnimationFrame(()=>window.scrollTo({top:y,behavior:'instant'}));};
 
+// League HQ v1.8.1 — optional director-approved regular-season balancing match
+// on reserved championship date. Team Night format and matchups are unchanged.
+function lhq181Proposal(result,teams){
+ const regular=Object.fromEntries(teams.map(t=>[t.id,0]));
+ const teamNight=Object.fromEntries(teams.map(t=>[t.id,0]));
+ const formats=new Map(result.sessions.map(s=>[s.date,s.kind]));
+ for(const m of result.matches){
+  if(m.balancing)continue;
+  const counts=formats.get(m.date)==='round_robin'?teamNight:regular;
+  if(counts[m.home]===undefined||counts[m.away]===undefined)return null;
+  counts[m.home]++;counts[m.away]++;
+ }
+ const ids=teams.map(t=>t.id),nightTotals=ids.map(id=>teamNight[id]);
+ if(new Set(nightTotals).size!==1)return null; // Never compensate for Team Night: it must already be fair.
+ const max=Math.max(...ids.map(id=>regular[id])),min=Math.min(...ids.map(id=>regular[id]));
+ if(max-min!==1)return null;
+ const short=ids.filter(id=>regular[id]===min);
+ if(short.length!==2||!ids.every(id=>regular[id]===max||short.includes(id)))return null;
+ const championship=result.sessions.find(s=>s.kind==='championship');
+ if(!championship)return null;
+ return {home:short[0],away:short[1],date:championship.date,week:championship.week,regular,teamNight,courts:championship.courts,time:championship.start||'18:00'};
+}
+function lhq181Build(plan,teams){
+ const result=lhq181PreviousBuild(plan,teams),proposal=lhq181Proposal(result,teams);
+ result.balancing={proposal,enabled:false};
+ if(!plan.balancing?.enabled)return result;
+ if(!proposal)throw Error('No eligible pair of teams is one regular-season match short. Remove the balancing selection and regenerate the preview.');
+ const time=String(plan.balancing.time||proposal.time),court=Number(plan.balancing.court||1);
+ if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))throw Error('Balancing match start must use HH:MM.');
+ if(!Number.isInteger(court)||court<1||court>proposal.courts)throw Error('Choose an available championship-day court.');
+ const start=flow172Minutes(time),opening=flow172Minutes(proposal.time);
+ if(start<opening||start+40>21*60+30)throw Error('Balancing match must start after the championship session opens and finish no later than 9:30 PM.');
+ const m={home:proposal.home,away:proposal.away,date:proposal.date,week:proposal.week,time,court,best_of:3,target:21,targets:[21,21,15],standings:true,play_all_sets:true,balancing:true};
+ // The championship session stores a pre-bracket regular-season fixture with the same authoritative set rules.
+ // M16 handles the differing standings/mandatory-third-set flags on this special date.
+ result.matches.push(m);
+ for(const id of [m.home,m.away]){
+  const count=result.capacity.totals.find(t=>t.id===id);if(count){count.games++;count.regular++;}
+ }
+ result.balancing.enabled=true;
+ result.balancing.match=m;
+ const values=result.capacity.totals.map(t=>t.regular);
+ const spread=Math.max(...values)-Math.min(...values);
+ result.capacity.warnings=result.capacity.warnings.filter(w=>!w.startsWith('Season totals differ by')&&!w.startsWith('Some game totals still differ by one'));
+ result.capacity.reconciliation={...(result.capacity.reconciliation||{}),spread:Math.max(...result.capacity.totals.map(t=>t.games))-Math.min(...result.capacity.totals.map(t=>t.games)),perfect:new Set(result.capacity.totals.map(t=>t.games)).size===1};
+ if(spread)result.capacity.warnings.push('Regular-season games remain uneven after balancing; review the schedule.');
+ return result;
+}
+const lhq181PreviousBuild=flow172Build;
+flow172Build=lhq181Build;
+flow171Build=lhq181Build;
+flow17Build=lhq181Build;
+const lhq181PreviousSchedulePage=flow17SchedulePage;
+flow17SchedulePage=function(){
+ let html=lhq181PreviousSchedulePage();
+ const candidate=flow17.previewScope===flow17Scope()?flow17.preview:null;
+ if(flow17Plan()){
+  const sessionRows=flow17Sessions();
+  const existing={sessions:sessionRows.map(s=>({date:s.session_date,week:s.week_index,kind:s.session_kind,courts:s.court_count,start:String(s.start_time||'18:00').slice(0,5)})),matches:matchRows('regular').filter(m=>m.round_label!=='Final balancing match').map(m=>({home:m.home_team_id,away:m.away_team_id,date:m.match_date}))};
+  const proposal=lhq181Proposal(existing,seasonRows('teams'));
+  if(!proposal||compBracket())return html;
+  const names=[teamName(proposal.home),teamName(proposal.away)].map(esc);
+  const card=`<div class="card" id="lhq181Published"><h2>Balance published regular-season schedule</h2><p class="mini">Two teams have one fewer regular-season match. Add one match before the championship without changing existing fixtures, scores, or Team Night games.</p><p><strong>${names[0]} vs ${names[1]}</strong> · ${esc(proposal.date)} · 21/21/15, all three sets</p><div class="split"><label class="field"><span class="label">Start time (40 minutes)</span><input id="lhq181PublishedTime" type="time" value="${esc(proposal.time)}"></label><label class="field"><span class="label">Court</span><select id="lhq181PublishedCourt">${Array.from({length:proposal.courts},(_,i)=>`<option value="${i+1}">Court ${i+1}</option>`).join('')}</select></label></div><p class="mini">A finalized result is required before the championship can be seeded. The bracket will not be generated automatically.</p><button class="btn primary" id="lhq181PublishedAdd">Add balancing match</button></div>`;
+  return html+card;
+ }
+ if(!candidate)return html;
+ const proposal=candidate.result.balancing?.proposal;
+ const selected=candidate.result.balancing?.enabled;
+ let card='';
+ if(proposal){
+  const names=[teamName(proposal.home),teamName(proposal.away)].map(esc);
+  const t=candidate.plan.balancing?.time||proposal.time;
+  const c=Number(candidate.plan.balancing?.court||1);
+  card=`<div class="card" id="lhq181Balance"><h2>Final regular-season balancing match</h2><p class="mini">Team Nights are already equal. Two teams have one fewer regular-season match. Offer them one more 21/21/15 match before championship play. Their result must be finalized before seeds and brackets unlock.</p><div class="note"><strong>${names[0]} vs ${names[1]}</strong> · Championship week ${proposal.week} · ${esc(proposal.date)}<br>Both have ${proposal.regular[proposal.home]} regular-season matches; other teams have ${proposal.regular[proposal.home]+1}. Team Night matches are unchanged.</div><div class="split"><label class="field"><span class="label">Start time (40 minutes)</span><input id="lhq181Time" type="time" value="${esc(t)}"></label><label class="field"><span class="label">Court</span><select id="lhq181Court">${Array.from({length:proposal.courts},(_,i)=>`<option value="${i+1}" ${i+1===c?'selected':''}>Court ${i+1}</option>`).join('')}</select></label></div><p class="mini">The championship begins after this result is finalized. Allow enough time for the entire bracket; the app does not automatically assign championship court times.</p><button class="btn ${selected?'danger':'primary'}" id="lhq181Toggle">${selected?'Remove balancing match':'Include balancing match in preview'}</button>${selected?'<p class="mini">Included in the unpublished schedule. Publishing saves it as an official regular-season fixture on championship day.</p>':''}</div>`;
+ }else{
+  card='<div class="card"><h2>Regular-season balance</h2><p class="mini">No single eligible balancing match is suggested. Team Nights are not changed. If match counts remain uneven, review the fairness report and scheduling constraints.</p></div>';
+ }
+ const marker='<div class="card"><h2>Preview ·';
+ return html.includes(marker)?html.replace(marker,card+marker):html+card;
+};
+const lhq181PreviousWire=wireBase;
+wireBase=function(){lhq181PreviousWire();
+ const publishedBtn=$('lhq181PublishedAdd');if(publishedBtn)publishedBtn.onclick=()=>{
+  const existing={sessions:flow17Sessions().map(s=>({date:s.session_date,week:s.week_index,kind:s.session_kind,courts:s.court_count,start:String(s.start_time||'18:00').slice(0,5)})),matches:matchRows('regular').filter(m=>m.round_label!=='Final balancing match').map(m=>({home:m.home_team_id,away:m.away_team_id,date:m.match_date}))};
+  const proposal=lhq181Proposal(existing,seasonRows('teams'));
+  if(!proposal||compBracket())return setAlert('No eligible match or championship bracket already exists.',true);
+  const time=$('lhq181PublishedTime')?.value||proposal.time,court=Number($('lhq181PublishedCourt')?.value||1);
+  if(!confirm('Add a regular-season balancing match to championship day? Existing fixtures and scores will not change.'))return;
+  action(async()=>{const {error}=await db.rpc('lhq_balancing_match_create',{p_season_id:state.seasonId,p_home:proposal.home,p_away:proposal.away,p_time:time,p_court:court});if(error)throw error;},'Balancing match created; complete its scores before generating the championship.');
+ };
+ const btn=$('lhq181Toggle');if(!btn)return;btn.onclick=()=>{
+ try{
+  const c=flow17.preview;if(!c||flow17.previewScope!==flow17Scope())throw Error('Schedule preview expired; regenerate it.');
+  const enabled=!c.plan.balancing?.enabled;
+  const time=$('lhq181Time')?.value||c.result.balancing?.proposal?.time;
+  const court=Number($('lhq181Court')?.value||1);
+  const plan={...c.plan,balancing:enabled?{enabled,time,court}:null};
+  const result=flow172Build(plan,seasonRows('teams'));
+  flow17.preview={plan,result};render();
+ }catch(err){setAlert(err.message||String(err),true)}
+ };};
+
 init();
 </script></body></html>
